@@ -65,69 +65,68 @@
     z-index: 11;
   }
 
-#next-btn {
-  position: fixed;
-  right: 20px;
-  top: 25%;
-  transform: translateY(-50%);
-  font-size: 18px;
-  padding: 6px 10px;
-  background: rgba(255,255,255,0.15);
-  border: 1px solid #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  display: none;
-  z-index: 12;
-}
+  #next-btn {
+    position: fixed;
+    right: 20px;
+    top: 25%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    display: none;
+    z-index: 12;
+  }
 
-#cameraRadialTrigger {
-  position: fixed;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  font-size: 24000px;
-  text-align: center;
-  line-height: 44px;
-  cursor: pointer;
-  z-index: 20;
-  backdrop-filter: blur(6px);
-  user-select: none; /* ← ADD THIS */
-  -webkit-user-select: none; /* iOS Safari */
-}
+  #cameraRadialTrigger {
+    position: fixed;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 24px; /* Fixed: Changed from 24000px */
+    text-align: center;
+    line-height: 44px;
+    cursor: pointer;
+    z-index: 20;
+    backdrop-filter: blur(6px);
+    user-select: none;
+    -webkit-user-select: none;
+  }
 
-#cameraRadialMenu {
-  position: fixed;
-  left: 44px; /* trigger is 44px wide, so start just to its right */
-  top: 50%;
-  width: 200px;
-  height: 200px;
-  margin-left: -20px; /* slight left shift for visual centering */
-  margin-top: -100px;
-  pointer-events: none;
-  z-index: 21;
-}
+  #cameraRadialMenu {
+    position: fixed;
+    left: 44px;
+    top: 50%;
+    width: 200px;
+    height: 200px;
+    margin-left: -20px;
+    margin-top: -100px;
+    pointer-events: none;
+    z-index: 21;
+  }
 
-
-.camera-option {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid white;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  white-space: nowrap;
-  pointer-events: auto;
-  transform: translate(-50%, -50%);
-  transition: background 0.2s;
-  transform-origin: left center;
-}
+  .camera-option {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid white;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    pointer-events: auto;
+    transform: translate(-50%, -50%);
+    transition: background 0.2s;
+    transform-origin: left center;
+  }
 
   #controls {
     position: absolute;
@@ -148,11 +147,11 @@
     z-index: 20;
   }
 
-#photo {
-  user-select: auto;
-  -webkit-user-select: auto;
-  pointer-events: auto;
-}
+  #photo {
+    user-select: auto;
+    -webkit-user-select: auto;
+    pointer-events: auto;
+  }
 
   #controls.show {
     transform: translateX(-50%) translateY(0);
@@ -181,69 +180,66 @@
     font-size: 16px;
   }
 
-* {
-  user-select: none;
-  -webkit-user-select: none;
-}
+  * {
+    user-select: none;
+    -webkit-user-select: none;
+  }
 
-#text-btn {
-  position: fixed;
-  right: 20px;
-  bottom: calc(50% + 80px); /* Position below shutter button (50% + 70px/2 + spacing) */
-  font-size: 18px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  color: white;
-  z-index: 12;
-  user-select: none; /* Shield from selection */
-  -webkit-user-select: none; /* iOS Safari */
-}
+  #text-btn {
+    position: fixed;
+    right: 20px;
+    bottom: calc(50% + 80px);
+    font-size: 18px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+    z-index: 12;
+    user-select: none;
+    -webkit-user-select: none;
+  }
 
-#text-input-modal {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
-  padding: 12px;
-  border-radius: 10px;
-  display: flex;
-  gap: 10px;
-  width: calc(100% - 32px);
-  max-width: 480px;
-  z-index: 25;
-  user-select: none; /* Shield modal from selection */
-  -webkit-user-select: none;
-}
+  #text-input-modal {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    padding: 12px;
+    border-radius: 10px;
+    display: flex;
+    gap: 10px;
+    width: calc(100% - 32px);
+    max-width: 480px;
+    z-index: 25;
+    user-select: none;
+    -webkit-user-select: none;
+  }
 
-#text-input {
-  flex: 1;
-  padding: 6px;
-  border: 1px solid white;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: 16px;
-  user-select: auto; /* Allow text input selection */
-  -webkit-user-select: auto;
-}
+  #text-input {
+    flex: 1;
+    padding: 6px;
+    border: 1px solid white;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 16px;
+    user-select: auto;
+    -webkit-user-select: auto;
+  }
 
-#text-submit, #text-cancel {
-  padding: 6px 12px;
-  border: 1px solid white;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-
-
+  #text-submit, #text-cancel {
+    padding: 6px 12px;
+    border: 1px solid white;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
 </style>
 
 </head>
@@ -278,6 +274,7 @@
     <button id="text-submit">OK</button>
     <button id="text-cancel">Cancel</button>
   </div>
+
 <script>
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
@@ -299,6 +296,8 @@ let currentStream = null;
 let grainAmount = +grainSlider.value;
 let film = filmSelect.value;
 let userText = '';
+let processedImageData = null;
+let imageDimensions = null;
 
 grainSlider.oninput = () => {
   grainAmount = +grainSlider.value;
@@ -319,6 +318,8 @@ nextBtn.onclick = () => {
   nextBtn.style.display = 'none';
   textBtn.style.display = 'none';
   userText = '';
+  processedImageData = null;
+  imageDimensions = null;
 };
 
 cameraSelect.onchange = () => {
@@ -363,7 +364,7 @@ async function populateCameraOptions() {
   videoInputs.forEach((device, i) => {
     const opt = document.createElement('option');
     opt.value = device.deviceId;
-    opt.textContent = device.label || `Camera ${i + 1}`; // Fixed: Numbered fallback label
+    opt.textContent = device.label || `Camera `;
     cameraSelect.appendChild(opt);
   });
 
@@ -448,9 +449,9 @@ function showCameraRadialMenu() {
 
     const btn = document.createElement('div');
     btn.className = 'camera-option';
-    btn.style.left = `${x}px`; // Fixed: Correct x position
-    btn.style.top = `${y}px`; // Fixed: Correct y position
-    btn.style.transform = `translate(-50%, -50%) rotate(${angle * 180 / Math.PI}deg)`; // Fixed: Correct rotation
+    btn.style.left = `px`;
+    btn.style.top = `px`;
+    btn.style.transform = `translate(-50%, -50%) rotate(deg)`;
     btn.style.transformOrigin = 'left center';
     btn.textContent = opt.textContent;
     btn.setAttribute('data-device-id', opt.value);
@@ -474,7 +475,9 @@ textBtn.onclick = () => {
 
 textSubmit.onclick = () => {
   userText = textInput.value.trim();
-  if (userText) {
+  if (userText && processedImageData && imageDimensions) {
+    updatePhotoText();
+  } else if (userText) {
     renderPhotoWithText();
   }
   hideTextInputModal();
@@ -506,6 +509,8 @@ function renderPhotoWithText() {
   canvas.width = finalW;
   canvas.height = finalH;
 
+  imageDimensions = { w, h, border, finalW, bottomBorder, finalH };
+
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, finalW, finalH);
@@ -534,15 +539,54 @@ function renderPhotoWithText() {
     d[i + 2] = Math.max(0, Math.min(255, b));
   }
 
+  processedImageData = imgData;
   ctx.putImageData(imgData, border, border);
 
   if (userText) {
-    let fontSize = 48; // Increased from 24
-    ctx.font = `${fontSize}px "Caveat", cursive`; // Fixed template literal
+    let fontSize = 48;
+    ctx.font = `px "Caveat", cursive`;
     let textWidth = ctx.measureText(userText).width;
-    while (textWidth > finalW - 20 && fontSize > 16) { // Minimum font size 16
+    while (textWidth > finalW - 20 && fontSize > 16) {
       fontSize--;
-      ctx.font = `${fontSize}px "Caveat", cursive`; // Fixed template literal
+      ctx.font = `px "Caveat", cursive`;
+      textWidth = ctx.measureText(userText).width;
+    }
+    ctx.fillStyle = 'black';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textY = finalH - bottomBorder / 2;
+    ctx.fillText(userText, finalW / 2, textY);
+  }
+
+  photo.src = canvas.toDataURL('image/jpeg', 1.0);
+  photo.style.display = 'block';
+  video.style.display = 'none';
+  nextBtn.style.display = 'block';
+  textBtn.style.display = 'block';
+}
+
+function updatePhotoText() {
+  if (!processedImageData || !imageDimensions) {
+    alert('Error: No processed image available');
+    return;
+  }
+
+  const { finalW, finalH, border, w, h, bottomBorder } = imageDimensions;
+  canvas.width = finalW;
+  canvas.height = finalH;
+
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, finalW, finalH);
+  ctx.putImageData(processedImageData, border, border);
+
+  if (userText) {
+    let fontSize = 48;
+    ctx.font = `px "Caveat", cursive`;
+    let textWidth = ctx.measureText(userText).width;
+    while (textWidth > finalW - 20 && fontSize > 16) {
+      fontSize--;
+      ctx.font = `px "Caveat", cursive`;
       textWidth = ctx.measureText(userText).width;
     }
     ctx.fillStyle = 'black';
