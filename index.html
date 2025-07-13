@@ -249,6 +249,11 @@ function showCameraRadialMenu(){
     btn.style.top       = `${y}px`;
     btn.textContent     = o.textContent;
     btn.setAttribute('data-device-id', o.value);
+    btn.addEventListener('pointerenter', () => {
+  currentHoveredOpt  = btn;                         // mark as hovered
+  btn.style.background = 'rgba(255,255,255,0.4)';   // highlight
+});
+
     btn.addEventListener('pointerup', e => {
     e.stopPropagation();                       // don’t bubble to global handler
     cameraSelect.value = btn.dataset.deviceId; // update dropdown
