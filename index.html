@@ -192,20 +192,28 @@ cameraRadialTrigger.addEventListener('pointerdown', () => {
 document.addEventListener('pointermove', e => {
   if (!radialActive) return;
 
-  // NEW: peek at the element under the finger
-  const hovered = document.elementFromPoint(e.clientX, e.clientY);
+  // ---------- 1) SNAP TO ANY OPTION WITH GENEROUS RADIUS ----------
+  const opts = document.querySelectorAll('.camera-option');
+  let   closest = null;
+  let   minDist = Infinity;
 
-  // if it's one of our camera buttons, highlight & remember it
-  if (hovered && hovered.classList.contains('camera-option')) {
-    if (currentHoveredOpt && currentHoveredOpt !== hovered)
-      currentHoveredOpt.style.background = 'rgba(255,255,255,0.15)';
+  opts.forEach(opt => {
+    const r  = opt.getBoundingClientRect();
+    const cx = r.left + r.width  / 2;
+    const cy = r.top  + r.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+    const d  = Math.hypot(dx, dy);
 
-    currentHoveredOpt = hovered;
-    hovered.style.background = 'rgba(255,255,255,0.4)';
-  } else if (currentHoveredOpt) {          // finger moved off any option
-    currentHoveredOpt.style.background = 'rgba(255,255,255,0.15)';
-    currentHoveredOpt = null;
-  }
+    // 120 px radius (bigger than the old 80 px so it’s forgiving)
+    if (d < minDist && d < 120) { minDist = d; closest = opt; }
+    opt.style.background = 'rgba(255,255,255,0.15)';
+  });
+
+  // ---------- 2) HIGHLIGHT WHATEVER’S CLOSEST ----------
+  currentHoveredOpt = closest;
+  if (closest) closest.style.background = 'rgba(255,255,255,0.4)';
+
 });
 
 
