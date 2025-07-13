@@ -543,14 +543,15 @@ function renderPhotoWithText() {
   ctx.putImageData(imgData, border, border);
 
   if (userText) {
-    let fontSize = 600;
-    ctx.font = `px "Caveat", cursive`;
-    let textWidth = ctx.measureText(userText).width;
-    while (textWidth > finalW - 20 && fontSize > 16) {
-      fontSize--;
-      ctx.font = `px "Caveat", cursive`;
-      textWidth = ctx.measureText(userText).width;
-    }
+  let fontSize = 600;
+  ctx.font = `${fontSize}px "Caveat", cursive`;
+  let textWidth = ctx.measureText(userText).width;
+  while (textWidth > finalW - 20 && fontSize > 16) {
+    fontSize--;
+    ctx.font = `${fontSize}px "Caveat", cursive`;
+    textWidth = ctx.measureText(userText).width;
+}
+
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -581,14 +582,15 @@ function updatePhotoText() {
   ctx.putImageData(processedImageData, border, border);
 
   if (userText) {
-    let fontSize = 48;
-    ctx.font = `px "Caveat", cursive`;
+    let fontSize = 600;
+    ctx.font = `${fontSize}px "Caveat", cursive`;
     let textWidth = ctx.measureText(userText).width;
     while (textWidth > finalW - 20 && fontSize > 16) {
       fontSize--;
-      ctx.font = `px "Caveat", cursive`;
+      ctx.font = `${fontSize}px "Caveat", cursive`;
       textWidth = ctx.measureText(userText).width;
-    }
+}
+
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
