@@ -1,4 +1,3 @@
-<!--  ✦ FULL-PASTE, READY-TO-RUN  ✦  -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +9,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
   <style>
-    /*  ----------  CORE STYLES (unchanged)  ----------  */
+    /* ----------  CORE STYLES (unchanged)  ---------- */
     body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden}
     video,img{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
     #menu-exit-btn,#gallery-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
@@ -36,7 +35,6 @@
 </head>
 <body>
 
-<!-- ----------  DOM ---------- -->
 <select id="cameraSelect"></select>
 <video id="video" autoplay playsinline></video>
 <img id="photo" style="display:none">
@@ -80,8 +78,8 @@
 
 <script>
 /* ---------- refs & state ---------- */
-const MAX_SIDE=4096;      
-  let currentURL = null;                    // ► keep track of object-URL// ≤ iOS canvas / img limit
+const MAX_SIDE=4096;        // iOS safe bitmap limit
+let currentURL=null;
 const video=document.getElementById('video');
 const canvas=document.getElementById('canvas');
 const photo=document.getElementById('photo');
@@ -105,34 +103,20 @@ const galleryOverlay=document.getElementById('gallery-overlay');
 const galleryContent=document.getElementById('gallery-content');
 
 let stream=null,imageCap=null,
-    grainAmt=+grainSlider.value,
-    film=filmSelect.value,
-    jpegQ=+jpegSlider.value,
-    userText='',processedImage=null,dim=null;
+    grainAmt=+grainSlider.value,film=filmSelect.value,
+    jpegQ=+jpegSlider.value,userText='',processedImage=null,dim=null;
 
 /* ---------- helpers ---------- */
 async function bestConstraints(facing="environment"){
-  const devices=(await navigator.mediaDevices.enumerateDevices())
-      .filter(d=>d.kind==="videoinput"
-          &&(facing==="user"?/front|user/:/(back|rear|environment)/i).test(d.label||""));
-  const id=devices[0]?.deviceId;
+  const dev=(await navigator.mediaDevices.enumerateDevices())
+             .find(d=>d.kind==="videoinput"&&
+                   (facing==="user"?/front|user/:/(back|rear|environment)/i).test(d.label||""));
+  const id=dev?.deviceId;
   const probe=await navigator.mediaDevices.getUserMedia({video:{deviceId:id,width:320,height:240}});
   const caps=probe.getVideoTracks()[0].getCapabilities?.()||{};
   probe.getTracks()[0].stop();
-
-  const maxW=caps.width?.max||caps.width||4096;
-  const maxH=caps.height?.max||caps.height||4096;
-
-  return{
-    audio:false,
-    video:{
-      deviceId:id,
-      width:{ideal:maxW},height:{ideal:maxH},
-      aspectRatio:{ideal:maxW/maxH},
-      facingMode:{exact:facing},
-      frameRate:{ideal:24,max:30}
-    }
-  };
+  const maxW=caps.width?.max||caps.width||4096,maxH=caps.height?.max||caps.height||4096;
+  return{audio:false,video:{deviceId:id,width:{ideal:maxW},height:{ideal:maxH},aspectRatio:{ideal:maxW/maxH},facingMode:{exact:facing},frameRate:{ideal:24,max:30}}};
 }
 
 /* ---------- camera ---------- */
@@ -147,52 +131,46 @@ async function bootCamera(facing="environment"){
   }catch(e){alert("Camera error: "+e.message);}
 }
 function populateCameraSelect(){
-  navigator.mediaDevices.enumerateDevices().then(devs=>{
+  navigator.mediaDevices.enumerateDevices().then(list=>{
     cameraSelect.innerHTML='';
-    devs.filter(d=>d.kind==="videoinput").forEach((d,i)=>{
-      const o=document.createElement('option');
-      o.value=d.deviceId;o.textContent=d.label||`Camera ${i+1}`;cameraSelect.appendChild(o);
+    list.filter(d=>d.kind==="videoinput").forEach((d,i)=>{
+      const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||`Camera ${i+1}`;cameraSelect.appendChild(o);
     });
   });
 }
 
-/* ---------- UI bindings ---------- */
+/* ---------- UI ---------- */
 grainSlider.oninput=()=>{grainAmt=+grainSlider.value;grainVal.textContent=grainAmt};
 filmSelect.onchange=()=>film=filmSelect.value;
 jpegSlider.oninput=()=>{jpegQ=+jpegSlider.value;jpegVal.textContent=jpegQ};
 menuBtn.onclick=()=>controls.classList.toggle('show');
-nextBtn.onclick=()=>{
-  video.style.display='block';photo.style.display='none';
-  nextBtn.style.display='none';textBtn.style.display='none';
-  userText='';processedImage=null;dim=null;
-  if(currentURL){ URL.revokeObjectURL(currentURL); currentURL=null; } /* ► clean up */
-};
+nextBtn.onclick=()=>{video.style.display='block';photo.style.display='none';nextBtn.style.display='none';textBtn.style.display='none';if(currentURL){URL.revokeObjectURL(currentURL);currentURL=null}};
 cameraSelect.onchange=()=>bootCamera();
 textBtn.onclick=()=>{textModal.style.display='flex';textInput.focus()};
 textCancel.onclick=()=>{textModal.style.display='none';textInput.value=''};
 textSubmit.onclick=()=>{userText=textInput.value.trim();textModal.style.display='none';processedImage?updateText():capture()};
 
 /* ---------- capture ---------- */
-shutter.onclick=capture;
+shutter.addEventListener('click',capture,{passive:true});   /* ← passive stops iOS delay glitch */
 
 async function getFullFrameBitmap(){
   if(imageCap?.takePhoto){
-    try{return await createImageBitmap(await imageCap.takePhoto());}catch{}
+    try{return await createImageBitmap(await imageCap.takePhoto());}catch{/* fall back */}
   }
-  const off=new OffscreenCanvas(video.videoWidth,video.videoHeight);
-  off.getContext('2d').drawImage(video,0,0);
-  return await createImageBitmap(off);
+  /* universal fallback: plain <canvas> (works everywhere) */
+  const temp=document.createElement('canvas');
+  temp.width=video.videoWidth;temp.height=video.videoHeight;
+  temp.getContext('2d').drawImage(video,0,0);
+  return (typeof createImageBitmap==="function") ? await createImageBitmap(temp) : temp; // either ImageBitmap or Canvas
 }
 
 async function capture(){
-  const bmp=await getFullFrameBitmap();
+  const bmp=await getFullFrameBitmap();                 // may return ImageBitmap OR Canvas
   const scale=Math.min(1,MAX_SIDE/Math.max(bmp.width,bmp.height));
   const w=Math.round(bmp.width*scale),h=Math.round(bmp.height*scale);
   const border=Math.floor(Math.min(w,h)*0.09);
   const fw=w+border*2,bot=border*2,fh=h+border+bot;
-
-  canvas.width=fw;canvas.height=fh;
-  dim={finalW:fw,finalH:fh,border,innerW:w,innerH:h,bottomBorder:bot};
+  canvas.width=fw;canvas.height=fh;dim={finalW:fw,finalH:fh,border,bottomBorder:bot};
 
   const ctx=canvas.getContext('2d',{alpha:false});
   ctx.fillStyle="#fff";ctx.fillRect(0,0,fw,fh);
@@ -201,35 +179,29 @@ async function capture(){
   const img=ctx.getImageData(border,border,w,h),d=img.data;
   for(let i=0;i<d.length;i+=4){
     let[r,g,b]=[d[i],d[i+1],d[i+2]];
-    if(film==="acros"){const a=(r+g+b)/3;r=g=b=a}
-    else{const a=(r+g+b)/3;r=r*.85+a*.15;g=g*.85+a*.15;b=b*.85+a*.15}
+    const avg=(r+g+b)/3;
+    if(film==="acros"){r=g=b=avg}else{r=r*.85+avg*.15;g=g*.85+avg*.15;b=b*.85+avg*.15}
     if(grainAmt){const n=(Math.random()-0.5)*2*grainAmt;r+=n;g+=n;b+=n}
     d[i]=r;d[i+1]=g;d[i+2]=b;
   }
-  processedImage=img;ctx.putImageData(img,border,border);
-  addText(ctx);
+  processedImage=img;ctx.putImageData(img,border,border);addText(ctx);
 
-  /* ► replace data-URI with Blob URL */
   canvas.toBlob(blob=>{
     if(currentURL)URL.revokeObjectURL(currentURL);
     currentURL=URL.createObjectURL(blob);
     photo.src=currentURL;
     photo.style.display='block';video.style.display='none';
     nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
-  },'image/jpeg',0.92);
+  },'image/jpeg',.92);
 }
-
-  
 
 function addText(ctx){
   if(!userText)return;
   const {finalW:fw,finalH:fh,bottomBorder:bot}=dim;
-  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;
-  while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}
+  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}
   ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillText(userText,fw/2,fh-bot/2);
 }
-
 function updateText(){
   const {finalW:fw,finalH:fh,border,bottomBorder:bot}=dim;
   canvas.width=fw;canvas.height=fh;
@@ -237,13 +209,11 @@ function updateText(){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);
   ctx.putImageData(processedImage,border,border);
   addText(ctx);
-
-  /* ► regenerate URL after text edit */
   canvas.toBlob(blob=>{
     if(currentURL)URL.revokeObjectURL(currentURL);
     currentURL=URL.createObjectURL(blob);
     photo.src=currentURL;
-  },'image/jpeg',0.92);
+  },'image/jpeg',.92);
 }
 
 /* ---------- save ---------- */
@@ -253,8 +223,7 @@ saveBtn.onclick=()=>{
   const tmp=document.createElement('canvas');tmp.width=Math.floor(fw*scale);tmp.height=Math.floor(fh*scale);
   tmp.getContext('2d').drawImage(canvas,0,0,tmp.width,tmp.height);
   tmp.toBlob(blob=>{
-    const url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download=`photo-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(url);
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`photo-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(url);
     const fr=new FileReader();fr.onloadend=()=>localStorage.setItem(`saved-photo-${Date.now()}`,fr.result);fr.readAsDataURL(blob);
   },'image/jpeg',jpegQ/100);
 };
