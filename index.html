@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400&display=swap">
   
 <style>
   body {
@@ -46,21 +46,6 @@
     cursor: pointer;
     z-index: 10;
   }
-
-#text-btn {
-  position: fixed;
-  right: 20px;
-  bottom: 10px;
-  font-size: 16px;
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid white;
-  border-radius: 6px;
-  color: white;
-  z-index: 11;
-  cursor: pointer;
-}
-
 
   #menu-btn {
     position: fixed;
@@ -201,41 +186,63 @@
   -webkit-user-select: none;
 }
 
-
 #text-btn {
   position: fixed;
   right: 20px;
-  bottom: 20px;
-  font-size: 16px;
-  padding: 6px 12px;
-  background: rgba(255,255,255,0.2);
+  bottom: calc(50% + 80px); /* Position below shutter button (50% + 70px/2 + spacing) */
+  font-size: 18px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.15);
   border: 1px solid #fff;
   border-radius: 6px;
   cursor: pointer;
-  display: none;
+  color: white;
   z-index: 12;
+  user-select: none; /* Shield from selection */
+  -webkit-user-select: none; /* iOS Safari */
+}
+
+#text-input-modal {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  padding: 12px;
+  border-radius: 10px;
+  display: flex;
+  gap: 10px;
+  width: calc(100% - 32px);
+  max-width: 480px;
+  z-index: 25;
+  user-select: none; /* Shield modal from selection */
+  -webkit-user-select: none;
+}
+
+#text-input {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid white;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 16px;
+  user-select: auto; /* Allow text input selection */
+  -webkit-user-select: auto;
+}
+
+#text-submit, #text-cancel {
+  padding: 6px 12px;
+  border: 1px solid white;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
 }
 
-#textInputBox {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80%;
-  max-width: 400px;
-  padding: 10px;
-  font-size: 18px;
-  border: 2px solid white;
-  border-radius: 6px;
-  display: none;
-  z-index: 100;
-  font-family: 'Patrick Hand', cursive;
-  background: rgba(255,255,255,0.1);
-  color: white;
-  outline: none;
-}
+
 
 </style>
 
@@ -265,6 +272,14 @@
   </label>
 </div>
 
+  <button id="text-btn" style="display:none">TEXT</button>
+  <div id="text-input-modal" style="display:none">
+    <input type="text" id="text-input" maxlength="50" placeholder="Enter text">
+    <button id="text-submit">OK</button>
+    <button id="text-cancel">Cancel</button>
+  </div>
+
+
 <script>
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
@@ -277,10 +292,15 @@ const grainSlider = document.getElementById('grain');
 const grainVal = document.getElementById('grain-val');
 const filmSelect = document.getElementById('film');
 const cameraSelect = document.getElementById('cameraSelect');
-
+const textBtn = document.getElementById('text-btn');
+const textInputModal = document.getElementById('text-input-modal');
+const textInput = document.getElementById('text-input');
+const textSubmit = document.getElementById('text-submit');
+const textCancel = document.getElementById('text-cancel');
 let currentStream = null;
 let grainAmount = +grainSlider.value;
 let film = filmSelect.value;
+let userText = '';
 
 grainSlider.oninput = () => {
   grainAmount = +grainSlider.value;
@@ -300,9 +320,7 @@ nextBtn.onclick = () => {
   photo.style.display = 'none';
   nextBtn.style.display = 'none';
   textBtn.style.display = 'none';
-  textInputBox.style.display = 'none';
-  textInputBox.value = '';
-  addedCaption = '';
+  userText = '';
 };
 
 cameraSelect.onchange = () => {
@@ -342,13 +360,12 @@ async function populateCameraOptions() {
   videoInputs.forEach((device, i) => {
     const opt = document.createElement('option');
     opt.value = device.deviceId;
-    opt.textContent = device.label || `Camera ${i + 1}`;
+    opt.textContent = device.label || `Camera `;
     cameraSelect.appendChild(opt);
   });
 
   if (currentId) cameraSelect.value = currentId;
 }
-
 
 const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
 const cameraRadialMenu = document.getElementById('cameraRadialMenu');
@@ -416,8 +433,8 @@ function showCameraRadialMenu() {
   const options = Array.from(cameraSelect.options);
   const count = options.length;
   const clampedCount = Math.max(1, Math.min(7, count));
-  const startAngle = -Math.PI / 4; // -45 degrees
-  const endAngle = Math.PI / 4;    // +45 degrees
+  const startAngle = -Math.PI / 4;
+  const endAngle = Math.PI / 4;
   const spread = endAngle - startAngle;
   const radius = 90 + (clampedCount - 1) * 6;
 
@@ -428,9 +445,9 @@ function showCameraRadialMenu() {
 
     const btn = document.createElement('div');
     btn.className = 'camera-option';
-    btn.style.left = `${x}px`;
-    btn.style.top = `${y}px`;
-    btn.style.transform = `translate(-50%, -50%) rotate(${angle * 180 / Math.PI}deg)`;
+    btn.style.left = `px`;
+    btn.style.top = `px`;
+    btn.style.transform = `translate(-50%, -50%) rotate(deg)`;
     btn.style.transformOrigin = 'left center';
     btn.textContent = opt.textContent;
     btn.setAttribute('data-device-id', opt.value);
@@ -438,22 +455,51 @@ function showCameraRadialMenu() {
   });
 }
 
+function showTextInputModal() {
+  textInputModal.style.display = 'flex';
+  textInput.focus();
+}
 
+function hideTextInputModal() {
+  textInputModal.style.display = 'none';
+  textInput.value = '';
+}
 
-shutter.onclick = () => {
+textBtn.onclick = () => {
+  showTextInputModal();
+};
+
+textSubmit.onclick = () => {
+  userText = textInput.value.trim();
+  if (userText) {
+    renderPhotoWithText();
+  }
+  hideTextInputModal();
+};
+
+textCancel.onclick = () => {
+  hideTextInputModal();
+};
+
+textInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    textSubmit.click();
+  }
+});
+
+function renderPhotoWithText() {
   const w = video.videoWidth;
   const h = video.videoHeight;
   const border = Math.floor(Math.min(w, h) * 0.09);
-
   const finalW = w + border * 2;
-const bottomBorder = border * 2; // or tweak this to make it thicker
-const finalH = h + border + bottomBorder;
-canvas.width = finalW;
-canvas.height = finalH;
-
+  const bottomBorder = border * 2;
+  const finalH = h + border + bottomBorder;
+  canvas.width = finalW;
+  canvas.height = finalH;
 
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, finalW, finalH);
   ctx.drawImage(video, border, border, w, h);
 
@@ -462,66 +508,48 @@ canvas.height = finalH;
 
   for (let i = 0; i < d.length; i += 4) {
     let r = d[i], g = d[i + 1], b = d[i + 2];
-
-    if (film === "acros") {
+    if (film === 'acros') {
       const avg = (r + g + b) / 3;
       r = g = b = avg;
-    } else if (film === "kodachrome") {
+    } else if (film === 'kodachrome') {
       const avg = (r + g + b) / 3;
       r = r * 0.85 + avg * 0.15;
       g = g * 0.85 + avg * 0.15;
       b = b * 0.85 + avg * 0.15;
     }
-
     if (grainAmount > 0) {
       const n = (Math.random() - 0.5) * 2 * grainAmount;
       r += n; g += n; b += n;
     }
-
     d[i] = Math.max(0, Math.min(255, r));
     d[i + 1] = Math.max(0, Math.min(255, g));
     d[i + 2] = Math.max(0, Math.min(255, b));
   }
 
   ctx.putImageData(imgData, border, border);
-  photo.src = canvas.toDataURL('image/jpeg', 1.0);
-photo.style.display = 'block';
-video.style.display = 'none';
-nextBtn.style.display = 'block';
-textBtn.style.display = 'block';
-  
-};
-const textBtn = document.getElementById('text-btn');
-const textInputBox = document.getElementById('textInputBox');
-let addedCaption = '';
 
-textBtn.onclick = () => {
-  textInputBox.style.display = 'block';
-  textInputBox.focus();
-};
-
-textInputBox.addEventListener('change', () => {
-  addedCaption = textInputBox.value;
-  textInputBox.style.display = 'none';
-  
-  const w = canvas.width;
-  const h = canvas.height;
-  const ctx = canvas.getContext('2d');
-
-  ctx.font = '24px "Patrick Hand", cursive';
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.fillText(addedCaption, w / 2, h - 15); // adjust Y offset as needed
+  if (userText) {
+    ctx.font = '24px "Caveat", cursive';
+    ctx.fillStyle = 'black';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textY = finalH - bottomBorder / 2;
+    ctx.fillText(userText, finalW / 2, textY);
+  }
 
   photo.src = canvas.toDataURL('image/jpeg', 1.0);
-});
+  photo.style.display = 'block';
+  video.style.display = 'none';
+  nextBtn.style.display = 'block';
+  textBtn.style.display = 'block';
+}
 
-  window.onload = () => {
-  document.body.addEventListener('click', () => {
-    startCamera();
-  }, { once: true });
+shutter.onclick = () => {
+  userText = '';
+  renderPhotoWithText();
 };
 
+startCamera();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
@@ -545,10 +573,5 @@ document.addEventListener('contextmenu', function (e) {
   }
 }, { passive: false });
 </script>
-
-
-<div id="text-btn">TEXT</div>
-<input type="text" id="textInputBox" placeholder="Type caption..." maxlength="100">
-
 </body>
 </html>
