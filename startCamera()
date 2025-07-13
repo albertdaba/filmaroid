@@ -33,6 +33,18 @@
     background: black;
   }
 
+#menu-exit-btn,
+#gallery-btn {
+  padding: 8px;
+  font-size: 16px;
+  border: 1px solid white;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  cursor: pointer;
+}
+
+  
   #shutter {
     position: fixed;
     right: 20px;
@@ -46,6 +58,20 @@
     cursor: pointer;
     z-index: 10;
   }
+  
+#save-btn {
+  position: fixed;
+  right: 20px;
+  top: calc(25% + 50px);
+  font-size: 18px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 12;
+  color: white;
+}
 
   #menu-btn {
     position: fixed;
@@ -252,6 +278,7 @@
 
 <div id="menu-btn">☰</div>
 <div id="next-btn">↩ Next</div>
+  <button id="save-btn" style="display:none">Save</button>
 <button id="shutter"></button>
 <div id="cameraRadialTrigger"></div>
 <div id="cameraRadialMenu"></div>
@@ -261,6 +288,12 @@
       <option value="kodachrome">Kodachrome</option>
       <option value="acros">Acros (Monochrome)</option>
     </select>
+    <label>JPEG Compression (<span id="jpeg-quality-val">60</span>%)
+  <input type="range" id="jpeg-quality" min="20" max="100" value="60">
+</label>
+<button id="menu-exit-btn">Exit Menu</button>
+<button id="gallery-btn">View Gallery</button>
+
 
   </label>
   <label>Film Grain (<span id="grain-val">19</span>)
@@ -371,6 +404,15 @@ async function populateCameraOptions() {
   if (currentId) cameraSelect.value = currentId;
 }
 
+const jpegQualitySlider = document.getElementById('jpeg-quality');
+const jpegQualityVal = document.getElementById('jpeg-quality-val');
+let jpegQuality = +jpegQualitySlider.value;
+
+jpegQualitySlider.oninput = () => {
+  jpegQuality = +jpegQualitySlider.value;
+  jpegQualityVal.textContent = jpegQuality;
+};
+  
 const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
 const cameraRadialMenu = document.getElementById('cameraRadialMenu');
 
@@ -480,6 +522,7 @@ textSubmit.onclick = () => {
   } else if (userText) {
     renderPhotoWithText();
   }
+  
   hideTextInputModal();
 };
 
@@ -564,6 +607,8 @@ function renderPhotoWithText() {
   video.style.display = 'none';
   nextBtn.style.display = 'block';
   textBtn.style.display = 'block';
+  document.getElementById('save-btn').style.display = 'block';
+
 }
 
 function updatePhotoText() {
@@ -604,6 +649,8 @@ function updatePhotoText() {
   video.style.display = 'none';
   nextBtn.style.display = 'block';
   textBtn.style.display = 'block';
+  document.getElementById('save-btn').style.display = 'block';
+
 }
 
 shutter.onclick = () => {
@@ -611,7 +658,66 @@ shutter.onclick = () => {
   renderPhotoWithText();
 };
 
+const saveBtn = document.getElementById('save-btn');
+saveBtn.onclick = async () => {
+  if (!processedImageData || !imageDimensions) return;
+
+  const { finalW, finalH } = imageDimensions;
+  const scale = 1810 / 4420;
+
+  const smallCanvas = document.createElement('canvas');
+  smallCanvas.width = Math.floor(finalW * scale);
+  smallCanvas.height = Math.floor(finalH * scale);
+
+  const ctx = smallCanvas.getContext('2d');
+  ctx.drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
+
+  const jpegBlob = await compressCanvasWithMozJPEG(smallCanvas, jpegQuality);
+
+  const url = URL.createObjectURL(jpegBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `photo-${Date.now()}.jpg`;
+  a.click();
+URL.revokeObjectURL(url);
+
+const reader = new FileReader();
+reader.onloadend = () => {
+  const dataURL = reader.result;
+  localStorage.setItem(`saved-photo-${Date.now()}`, dataURL);
+};
+reader.readAsDataURL(jpegBlob);
+
+};
+
+  
 startCamera();
+  document.getElementById('menu-exit-btn').onclick = () => {
+  controls.classList.remove('show');
+};
+
+document.getElementById('gallery-btn').onclick = () => {
+  const gallery = document.getElementById('gallery-content');
+  gallery.innerHTML = '';
+
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('saved-photo-'));
+
+  if (keys.length === 0) {
+    gallery.innerHTML = '<p style="color:white;">No saved images.</p>';
+  } else {
+    keys.sort().reverse();
+    keys.forEach(key => {
+      const img = document.createElement('img');
+      img.src = localStorage.getItem(key);
+      img.style.width = '100px';
+      img.style.height = 'auto';
+      gallery.appendChild(img);
+    });
+  }
+
+  document.getElementById('gallery-overlay').style.display = 'block';
+};
+
 </script>
 
 
@@ -637,5 +743,26 @@ document.addEventListener('contextmenu', function (e) {
   }
 }, { passive: false });
 </script>
+
+<script type="module">
+import init, { encode } from './lib/mozjpeg/mozjpeg_enc.js';
+
+await init(); // Load the WASM
+
+async function compressCanvasWithMozJPEG(canvas, quality) {
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  const result = encode(imageData.data, canvas.width, canvas.height, quality);
+  return new Blob([result.buffer], { type: 'image/jpeg' });
+}
+</script>
+
+<div id="gallery-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:99; overflow:auto; padding:10px;">
+  <button onclick="document.getElementById('gallery-overlay').style.display='none'" style="position:fixed; top:10px; right:10px; z-index:100;">Close</button>
+  <div id="gallery-content" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:50px;"></div>
+</div>
+
+  
 </body>
 </html>
