@@ -278,7 +278,6 @@
     <button id="text-submit">OK</button>
     <button id="text-cancel">Cancel</button>
   </div>
-
 <script>
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
@@ -353,13 +352,18 @@ async function populateCameraOptions() {
   const devices = await navigator.mediaDevices.enumerateDevices();
   const videoInputs = devices.filter(device => device.kind === 'videoinput');
 
+  if (videoInputs.length === 0) {
+    alert('No cameras detected');
+    return;
+  }
+
   const currentId = cameraSelect.value;
   cameraSelect.innerHTML = '';
 
   videoInputs.forEach((device, i) => {
     const opt = document.createElement('option');
     opt.value = device.deviceId;
-    opt.textContent = device.label || `Camera `;
+    opt.textContent = device.label || `Camera ${i + 1}`; // Fixed: Numbered fallback label
     cameraSelect.appendChild(opt);
   });
 
@@ -444,9 +448,9 @@ function showCameraRadialMenu() {
 
     const btn = document.createElement('div');
     btn.className = 'camera-option';
-    btn.style.left = `px`;
-    btn.style.top = `px`;
-    btn.style.transform = `translate(-50%, -50%) rotate(deg)`;
+    btn.style.left = `${x}px`; // Fixed: Correct x position
+    btn.style.top = `${y}px`; // Fixed: Correct y position
+    btn.style.transform = `translate(-50%, -50%) rotate(${angle * 180 / Math.PI}deg)`; // Fixed: Correct rotation
     btn.style.transformOrigin = 'left center';
     btn.textContent = opt.textContent;
     btn.setAttribute('data-device-id', opt.value);
@@ -533,12 +537,12 @@ function renderPhotoWithText() {
   ctx.putImageData(imgData, border, border);
 
   if (userText) {
-    let fontSize = 24;
-    ctx.font = `px "Caveat", cursive`;
+    let fontSize = 48; // Increased from 24
+    ctx.font = `${fontSize}px "Caveat", cursive`; // Fixed template literal
     let textWidth = ctx.measureText(userText).width;
-    while (textWidth > finalW - 20 && fontSize > 10) {
+    while (textWidth > finalW - 20 && fontSize > 16) { // Minimum font size 16
       fontSize--;
-      ctx.font = `px "Caveat", cursive`;
+      ctx.font = `${fontSize}px "Caveat", cursive`; // Fixed template literal
       textWidth = ctx.measureText(userText).width;
     }
     ctx.fillStyle = 'black';
@@ -562,6 +566,7 @@ shutter.onclick = () => {
 
 startCamera();
 </script>
+
 
 <script>
 if ('serviceWorker' in navigator) {
