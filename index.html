@@ -71,7 +71,7 @@
 </div>
 
 <script>
-/* ------- DOM refs & state ------- */
+/* -------- DOM refs -------- */
 const video=document.getElementById('video');
 const canvas=document.getElementById('canvas');
 const photo=document.getElementById('photo');
@@ -87,133 +87,196 @@ const cameraSelect=document.getElementById('cameraSelect');
 const jpegQualitySlider=document.getElementById('jpeg-quality');
 const jpegQualityVal=document.getElementById('jpeg-quality-val');
 const textBtn=document.getElementById('text-btn');
-const textModal=document.getElementById('text-input-modal');
+const textInputModal=document.getElementById('text-input-modal');
 const textInput=document.getElementById('text-input');
 const textSubmit=document.getElementById('text-submit');
 const textCancel=document.getElementById('text-cancel');
 
-let currentStream=null,grainAmount=+grainSlider.value,film=filmSelect.value,
-    jpegQuality=+jpegQualitySlider.value,userText='',processedImageData=null,imageDimensions=null;
+/* -------- state -------- */
+let currentStream=null;
+let grainAmount=+grainSlider.value;
+let film=filmSelect.value;
+let jpegQuality=+jpegQualitySlider.value;
+let userText='';
+let processedImageData=null;
+let imageDimensions=null;
 
-/* ------- basic UI ------- */
+/* -------- UI handlers -------- */
 grainSlider.oninput=()=>{grainAmount=+grainSlider.value;grainVal.textContent=grainAmount};
 filmSelect.onchange=()=>{film=filmSelect.value};
 jpegQualitySlider.oninput=()=>{jpegQuality=+jpegQualitySlider.value;jpegQualityVal.textContent=jpegQuality};
 menuBtn.onclick=()=>controls.classList.toggle('show');
 nextBtn.onclick=()=>{video.style.display='block';photo.style.display='none';nextBtn.style.display='none';textBtn.style.display='none';userText='';processedImageData=null;imageDimensions=null};
 
-/* ------- camera ------- */
+/* -------- camera setup -------- */
 cameraSelect.onchange=()=>startCamera(cameraSelect.value);
 async function startCamera(deviceId=null){
   if(currentStream)currentStream.getTracks().forEach(t=>t.stop());
   const constraints={video:deviceId?{deviceId:{exact:deviceId},width:{ideal:4096},height:{ideal:2160}}:{facingMode:{exact:'environment'},width:{ideal:4096},height:{ideal:2160}}};
   try{
     currentStream=await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject=currentStream;await video.play();await populateCameraOptions();
+    video.srcObject=currentStream;
+    await video.play();
+    await populateCameraOptions();
   }catch(e){alert('Camera Error: '+(e.name==='NotAllowedError'?'Camera access denied':e.message));}
 }
 async function populateCameraOptions(){
-  const vids=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
-  cameraSelect.innerHTML='';vids.forEach((d,i)=>{const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||`Camera ${i+1}`;cameraSelect.appendChild(o)});
+  const devices=await navigator.mediaDevices.enumerateDevices();
+  const vids=devices.filter(d=>d.kind==='videoinput');
+  cameraSelect.innerHTML='';
+  vids.forEach((d,i)=>{
+    const o=document.createElement('option');
+    o.value=d.deviceId;
+    o.textContent=d.label||`Camera ${i+1}`;/* FIXED */
+    cameraSelect.appendChild(o);
+  });
 }
 
-/* ------- radial menu (unchanged) ------- */
+/* -------- radial menu (unchanged) -------- */
 const cameraRadialTrigger=document.getElementById('cameraRadialTrigger');
 const cameraRadialMenu=document.getElementById('cameraRadialMenu');
-let radialTimeout=null,radialActive=false,currentHovered=null;
-cameraRadialTrigger.addEventListener('pointerdown',()=>{radialTimeout=setTimeout(()=>{showRadial();radialActive=true},300)});
+let radialTimeout=null,radialActive=false,currentHoveredOption=null;
+cameraRadialTrigger.addEventListener('pointerdown',()=>{radialTimeout=setTimeout(()=>{showCameraRadialMenu();radialActive=true},300);});
 document.addEventListener('pointermove',e=>{
   if(!radialActive)return;
+  const opts=document.querySelectorAll('.camera-option');
   let closest=null,min=Infinity;
-  document.querySelectorAll('.camera-option').forEach(opt=>{
-    const r=opt.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),dist=Math.hypot(dx,dy);
-    if(dist<min&&dist<80){min=dist;closest=opt}opt.style.background='rgba(255,255,255,.15)';
+  opts.forEach(opt=>{
+    const r=opt.getBoundingClientRect();
+    const dx=e.clientX-(r.left+r.width/2);
+    const dy=e.clientY-(r.top+r.height/2);
+    const dist=Math.hypot(dx,dy);
+    if(dist<min&&dist<80){min=dist;closest=opt}
+    opt.style.background='rgba(255,255,255,.15)';
   });
-  currentHovered=closest;if(closest)closest.style.background='rgba(255,255,255,.4)';
+  currentHoveredOption=closest;
+  if(closest)closest.style.background='rgba(255,255,255,.4)';
 });
-document.addEventListener('pointerup',()=>{clearTimeout(radialTimeout);if(radialActive){if(currentHovered){cameraSelect.value=currentHovered.dataset.id;startCamera(currentHovered.dataset.id)}cameraRadialMenu.innerHTML='';radialActive=false}});
-function showRadial(){
+document.addEventListener('pointerup',()=>{
+  clearTimeout(radialTimeout);
+  if(radialActive){
+    if(currentHoveredOption){
+      cameraSelect.value=currentHoveredOption.dataset.deviceId;
+      startCamera(currentHoveredOption.dataset.deviceId);
+    }
+    cameraRadialMenu.innerHTML='';radialActive=false;
+  }
+});
+function showCameraRadialMenu(){
   cameraRadialMenu.innerHTML='';
-  const opts=[...cameraSelect.options],n=opts.length,clamp=Math.max(1,Math.min(7,n)),start=-Math.PI/4,end=Math.PI/4,spread=end-start,r=90+(clamp-1)*6;
-  opts.forEach((o,i)=>{const a=start+i*spread/(clamp-1||1),x=Math.cos(a)*r+100,y=Math.sin(a)*r+100,d=document.createElement('div');d.className='camera-option';d.style.left=`${x}px`;d.style.top=`${y}px`;d.textContent=o.textContent;d.dataset.id=o.value;cameraRadialMenu.appendChild(d)});
+  const opts=[...cameraSelect.options];
+  const n=opts.length,clamp=Math.max(1,Math.min(7,n));
+  const start=-Math.PI/4,end=Math.PI/4,spread=end-start,radius=90+(clamp-1)*6;
+  opts.forEach((o,i)=>{
+    const angle=start+i*spread/(clamp-1||1);
+    const x=Math.cos(angle)*radius+100,y=Math.sin(angle)*radius+100;
+    const div=document.createElement('div');
+    div.className='camera-option';
+    div.style.left=`${x}px`;div.style.top=`${y}px`;
+    div.textContent=o.textContent;
+    div.dataset.deviceId=o.value;
+    cameraRadialMenu.appendChild(div);
+  });
 }
 
-/* ------- text modal ------- */
-function showText(){textModal.style.display='flex';textInput.focus()}
-function hideText(){textModal.style.display='none';textInput.value=''}
-textBtn.onclick=showText;
-textSubmit.onclick=()=>{userText=textInput.value.trim();userText&&(processedImageData?updateText():renderPhoto());hideText();}
-textCancel.onclick=hideText;
+/* -------- text modal -------- */
+function showTextInputModal(){textInputModal.style.display='flex';textInput.focus()}
+function hideTextInputModal(){textInputModal.style.display='none';textInput.value=''}
+textBtn.onclick=showTextInputModal;
+textSubmit.onclick=()=>{userText=textInput.value.trim();userText&&(processedImageData?updatePhotoText():renderPhotoWithText());hideTextInputModal();}
+textCancel.onclick=hideTextInputModal;
 textInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();textSubmit.click()}});
 
-/* ------- capture & render ------- */
-shutter.onclick=()=>{userText='';renderPhoto();};
-function renderPhoto(){
+/* -------- render photo -------- */
+shutter.onclick=()=>{userText='';renderPhotoWithText();};
+function renderPhotoWithText(){
   if(!video.videoWidth){alert('Video not ready');return;}
-  const w=video.videoWidth,h=video.videoHeight,b=Math.floor(Math.min(w,h)*0.09),fw=w+b*2,bot=b*2,fh=h+b+bot;
-  canvas.width=fw;canvas.height=fh;imageDimensions={w,h,border:b,finalW:fw,bottomBorder:bot,finalH:fh};
-  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);ctx.drawImage(video,b,b,w,h);
+  const w=video.videoWidth,h=video.videoHeight,b=Math.floor(Math.min(w,h)*0.09);
+  const finalW=w+b*2,bot=b*2,finalH=h+b+bot;
+  canvas.width=finalW;canvas.height=finalH;
+  imageDimensions={w,h,border:b,finalW,bottomBorder:bot,finalH};
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,finalW,finalH);ctx.drawImage(video,b,b,w,h);
   const img=ctx.getImageData(b,b,w,h),d=img.data;
   for(let i=0;i<d.length;i+=4){
-    let[r,g,bl]=[d[i],d[i+1],d[i+2]];
-    if(film==='acros'){const a=(r+g+bl)/3;r=g=bl=a}else if(film==='kodachrome'){const a=(r+g+bl)/3;r=r*.85+a*.15;g=g*.85+a*.15;bl=bl*.85+a*.15}
-    if(grainAmount){const n=(Math.random()-0.5)*2*grainAmount;r+=n;g+=n;bl+=n}
-    d[i]=Math.max(0,Math.min(255,r));d[i+1]=Math.max(0,Math.min(255,g));d[i+2]=Math.max(0,Math.min(255,bl));
+    let[r,g,b2]=[d[i],d[i+1],d[i+2]];
+    if(film==='acros'){const a=(r+g+b2)/3;r=g=b2=a}
+    else if(film==='kodachrome'){const a=(r+g+b2)/3;r=r*.85+a*.15;g=g*.85+a*.15;b2=b2*.85+a*.15}
+    if(grainAmount){const n=(Math.random()-0.5)*2*grainAmount;r+=n;g+=n;b2+=n}
+    d[i]=Math.max(0,Math.min(255,r));d[i+1]=Math.max(0,Math.min(255,g));d[i+2]=Math.max(0,Math.min(255,b2));
   }
   processedImageData=img;ctx.putImageData(img,b,b);
-  if(userText){let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(userText,fw/2,fh-bot/2);}
-  photo.src=canvas.toDataURL('image/jpeg',1.0);photo.style.display='block';video.style.display='none';nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
+  if(userText){
+    let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;let tw=ctx.measureText(userText).width;
+    while(tw>finalW-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`;tw=ctx.measureText(userText).width;}
+    ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(userText,finalW/2,finalH-bot/2);
+  }
+  photo.src=canvas.toDataURL('image/jpeg',1.0);photo.style.display='block';
+  video.style.display='none';nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
 }
-function updateText(){
-  const{finalW:fw,finalH:fh,bottomBorder:bot,border:b}=imageDimensions;
-  canvas.width=fw;canvas.height=fh;
-  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);ctx.putImageData(processedImageData,b,b);
-  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(userText,fw/2,fh-bot/2);
+function updatePhotoText(){
+  if(!processedImageData){alert('No image');return;}
+  const{finalW,finalH,border:b,bottomBorder:bot}=imageDimensions;
+  canvas.width=finalW;canvas.height=finalH;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,finalW,finalH);
+  ctx.putImageData(processedImageData,b,b);
+  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;let tw=ctx.measureText(userText).width;
+  while(tw>finalW-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`;tw=ctx.measureText(userText).width;}
+  ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(userText,finalW/2,finalH-bot/2);
   photo.src=canvas.toDataURL('image/jpeg',1.0);
 }
 
-/* ------- SAVE (await WASM) ------- */
+/* -------- save button (waits for WASM) -------- */
 saveBtn.onclick=async()=>{
   if(!processedImageData)return;
-  await window.mozjpegReady;
-  const{finalW:fw,finalH:fh}=imageDimensions,scale=1810/4420;
-  const temp=document.createElement('canvas');temp.width=Math.floor(fw*scale);temp.height=Math.floor(fh*scale);
-  temp.getContext('2d').drawImage(canvas,0,0,temp.width,temp.height);
-  const blob=await compressCanvasWithMozJPEG(temp,jpegQuality);
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`photo-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(url);
+  await window.mozjpegReady;     /* wait for encoder */
+  const{finalW,finalH}=imageDimensions,scale=1810/4420;
+  const small=document.createElement('canvas');
+  small.width=Math.floor(finalW*scale);
+  small.height=Math.floor(finalH*scale);
+  small.getContext('2d').drawImage(canvas,0,0,small.width,small.height);
+  const blob=await compressCanvasWithMozJPEG(small,jpegQuality);
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`photo-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(url);
   const r=new FileReader();r.onloadend=()=>localStorage.setItem(`saved-photo-${Date.now()}`,r.result);r.readAsDataURL(blob);
 };
 
-/* ------- gallery ------- */
+/* -------- gallery -------- */
 document.getElementById('gallery-btn').onclick=()=>{
   const gal=document.getElementById('gallery-content');gal.innerHTML='';
   const keys=Object.keys(localStorage).filter(k=>k.startsWith('saved-photo-')).sort().reverse();
   if(!keys.length)gal.innerHTML='<p style="color:white;">No saved images.</p>';
-  else keys.forEach(k=>{const img=document.createElement('img');img.src=localStorage.getItem(k);img.style.width='100px';gal.appendChild(img);});
+  else keys.forEach(k=>{const img=document.createElement('img');img.src=localStorage.getItem(k);img.style.width='100px';img.style.height='auto';gal.appendChild(img);});
   document.getElementById('gallery-overlay').style.display='block';
 };
 document.getElementById('menu-exit-btn').onclick=()=>controls.classList.remove('show');
 
-/* ------- boot ------- */
+/* -------- boot -------- */
 startCamera();
 </script>
 
 <script>
-if('serviceWorker'in navigator){navigator.serviceWorker.register('./service-worker.js').then(reg=>{reg.onupdatefound=()=>{const nw=reg.installing;nw.onstatechange=()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)alert('New update available! Please refresh.');};};});}
+if('serviceWorker'in navigator){
+  navigator.serviceWorker.register('./service-worker.js').then(reg=>{
+    reg.onupdatefound=()=>{const nw=reg.installing;nw.onstatechange=()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)alert('New update available! Please refresh.');};};
+  });
+}
 document.addEventListener('contextmenu',e=>{if(e.target.id!=='photo')e.preventDefault();},{passive:false});
 </script>
 
-<!-- ------- mozjpeg WASM (global promise) ------- -->
+<!-- ---------- mozjpeg WASM ---------- -->
 <script type="module">
 import init,{encode}from'./lib/mozjpeg/mozjpeg_enc.js';
-let res;window.mozjpegReady=new Promise(r=>res=r);
+let ready;window.mozjpegReady=new Promise(res=>ready=res);
 init().then(()=>{
   window.compressCanvasWithMozJPEG=async(c,q)=>{
     const ctx=c.getContext('2d'),img=ctx.getImageData(0,0,c.width,c.height);
-    const out=encode(img.data,c.width,c.height,q);
-    return new Blob([out.buffer],{type:'image/jpeg'});
+    const res=encode(img.data,c.width,c.height,q);
+    return new Blob([res.buffer],{type:'image/jpeg'});
   };
-  res(); /* resolve */
+  ready();                         /* resolve promise */
 });
 </script>
 
