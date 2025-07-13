@@ -118,7 +118,7 @@ grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textConten
 filmSelect.onchange = () => { film = filmSelect.value; };
 jpegSlider.oninput  = () => { jpegQ  = +jpegSlider.value; jpegVal.textContent = jpegQ; };
 menuBtn.onclick     = () => controls.classList.toggle('show');
-nextBtn.onclick     = () => { video.style.display='block'; photo.style.display='none'; nextBtn.style.display='none'; textBtn.style.display='none'; imgData=null; dim=null; userText=''; };
+nextBtn.onclick     = () => { video.style.display='block'; photo.style.display='none'; nextBtn.style.display='none'; textBtn.style.display='none';   saveBtn.style.display = 'none';  imgData=null; dim=null; userText=''; };
 
 /* ---------- camera core ---------- */
 cameraSelect.onchange = () => bootCam(cameraSelect.value);
