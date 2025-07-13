@@ -9,7 +9,6 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
   <style>
-    /* ------------- ORIGINAL CSS ------------- */
     body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden}
     video,img{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
     #menu-exit-btn,#gallery-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
@@ -17,11 +16,11 @@
     #save-btn{position:fixed;right:20px;top:calc(25% + 50px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
     #menu-btn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:26px;text-align:center;line-height:44px;backdrop-filter:blur(6px);cursor:pointer;z-index:11}
     #next-btn{position:fixed;right:20px;top:25%;transform:translateY(-50%);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;cursor:pointer;display:none;z-index:12}
-    #cameraRadialTrigger{position:fixed;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:24px;text-align:center;line-height:44px;cursor:pointer;z-index:20;backdrop-filter:blur(6px);user-select:none;-webkit-user-select:none}
+    #cameraRadialTrigger{position:fixed;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:24px;text-align:center;line-height:44px;cursor:pointer;z-index:20;backdrop-filter:blur(6px)}
     #cameraRadialMenu{position:fixed;left:44px;top:50%;width:200px;height:200px;margin-left:-20px;margin-top:-100px;pointer-events:none;z-index:21}
-    .camera-option{position:absolute;background:rgba(255,255,255,.15);border:1px solid #fff;color:#fff;padding:6px 12px;border-radius:6px;font-size:14px;cursor:pointer;white-space:nowrap;pointer-events:auto;transform:translate(-50%,-50%);transition:background .2s}
+    .camera-option{position:absolute;background:rgba(255,255,255,.15);border:1px solid #fff;color:#fff;padding:6px 12px;border-radius:6px;font-size:14px;cursor:pointer;white-space:nowrap;pointer-events:auto;transform:translate(-50%,-50%)}
     #controls{position:absolute;bottom:20px;left:50%;transform:translateX(-50%) translateY(100%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;transition:.3s ease;opacity:0;pointer-events:none;display:flex;flex-direction:column;gap:10px;width:calc(100% - 32px);max-width:480px;z-index:20}
-    #photo{user-select:auto;-webkit-user-select:auto;pointer-events:auto}
+    #photo{user-select:auto;pointer-events:auto}
     #controls.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
     input[type=range],select{width:100%}
     label{font-size:14px}
@@ -29,7 +28,7 @@
     *{user-select:none;-webkit-user-select:none}
     #text-btn{position:fixed;right:20px;bottom:calc(50% + 80px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
     #text-input-modal{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;display:flex;gap:10px;width:calc(100% - 32px);max-width:480px;z-index:25}
-    #text-input{flex:1;padding:6px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:16px;user-select:auto;-webkit-user-select:auto}
+    #text-input{flex:1;padding:6px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:16px;user-select:auto}
     #text-submit,#text-cancel{padding:6px 12px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
   </style>
 </head>
@@ -71,64 +70,57 @@
   <button id="text-cancel">Cancel</button>
 </div>
 
+<!-- Gallery overlay BEFORE script so IDs exist -->
+<div id="gallery-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:99;overflow:auto;padding:10px">
+  <button onclick="galleryOverlay.style.display='none'" style="position:fixed;top:10px;right:10px;z-index:100;">Close</button>
+  <button id="print-gallery-btn" style="position:fixed;top:10px;left:10px;z-index:100;">Print A4</button>
+  <div id="gallery-content" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:50px"></div>
+</div>
+
 <script>
-/* ------------ DOM refs & state ------------ */
-const video=document.getElementById('video');
-const canvas=document.getElementById('canvas');
-const photo=document.getElementById('photo');
-const shutter=document.getElementById('shutter');
-const saveBtn=document.getElementById('save-btn');
-const nextBtn=document.getElementById('next-btn');
-const menuBtn=document.getElementById('menu-btn');
-const controls=document.getElementById('controls');
-const grainSlider=document.getElementById('grain');
-const grainVal=document.getElementById('grain-val');
-const filmSelect=document.getElementById('film');
-const cameraSelect=document.getElementById('cameraSelect');
-const jpegSlider=document.getElementById('jpeg-quality');
-const jpegVal=document.getElementById('jpeg-quality-val');
-const textBtn=document.getElementById('text-btn');
-const textModal=document.getElementById('text-input-modal');
-const textInput=document.getElementById('text-input');
-const textSubmit=document.getElementById('text-submit');
-const textCancel=document.getElementById('text-cancel');
+const video=document.getElementById('video'),canvas=document.getElementById('canvas'),photo=document.getElementById('photo');
+const shutter=document.getElementById('shutter'),saveBtn=document.getElementById('save-btn'),nextBtn=document.getElementById('next-btn');
+const menuBtn=document.getElementById('menu-btn'),controls=document.getElementById('controls');
+const grainSlider=document.getElementById('grain'),grainVal=document.getElementById('grain-val');
+const filmSelect=document.getElementById('film'),cameraSelect=document.getElementById('cameraSelect');
+const jpegSlider=document.getElementById('jpeg-quality'),jpegVal=document.getElementById('jpeg-quality-val');
+const textBtn=document.getElementById('text-btn'),textModal=document.getElementById('text-input-modal');
+const textInput=document.getElementById('text-input'),textSubmit=document.getElementById('text-submit'),textCancel=document.getElementById('text-cancel');
+const galleryOverlay=document.getElementById('gallery-overlay'),galleryContent=document.getElementById('gallery-content');
+const printBtn=document.getElementById('print-gallery-btn');
 
-let stream=null,grainAmt=+grainSlider.value,film=filmSelect.value,jpegQ=+jpegSlider.value,
-    userText='',imgData=null,dim=null;
+let stream=null,grainAmt=+grainSlider.value,film=filmSelect.value,jpegQ=+jpegSlider.value,userText='',imgData=null,dim=null;
 
-/* ------------ UI bindings ------------ */
+/* UI */
 grainSlider.oninput=()=>{grainAmt=+grainSlider.value;grainVal.textContent=grainAmt};
 filmSelect.onchange=()=>film=filmSelect.value;
 jpegSlider.oninput=()=>{jpegQ=+jpegSlider.value;jpegVal.textContent=jpegQ};
 menuBtn.onclick=()=>controls.classList.toggle('show');
 nextBtn.onclick=()=>{video.style.display='block';photo.style.display='none';nextBtn.style.display='none';textBtn.style.display='none';imgData=null;dim=null;userText='';};
 
-/* ------------ camera ------------ */
+/* Camera */
 cameraSelect.onchange=()=>bootCam(cameraSelect.value);
 async function bootCam(id=null){
   if(stream)stream.getTracks().forEach(t=>t.stop());
   const c={video:id?{deviceId:{exact:id},width:{ideal:4096},height:{ideal:2160}}:{facingMode:{exact:'environment'},width:{ideal:4096},height:{ideal:2160}}};
-  try{
-    stream=await navigator.mediaDevices.getUserMedia(c);
-    video.srcObject=stream;await video.play();await cams();
-  }catch(e){alert('Camera error: '+e.message);}
+  try{stream=await navigator.mediaDevices.getUserMedia(c);video.srcObject=stream;await video.play();await listCams();}
+  catch(e){alert('Camera error: '+e.message);}
 }
-async function cams(){
+async function listCams(){
   const v=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
   cameraSelect.innerHTML='';v.forEach((d,i)=>{const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||`Camera ${i+1}`;cameraSelect.appendChild(o)});
 }
 
-/* ------------ text modal ------------ */
-function showModal(){textModal.style.display='flex';textInput.focus()}
+/* Text modal */
+function showModal(){textModal.style.display='flex';textInput.focus();}
 function hideModal(){textModal.style.display='none';textInput.value=''}
-textBtn.onclick=showModal;
-textCancel.onclick=hideModal;
-textSubmit.onclick=()=>{userText=textInput.value.trim();userText&&(imgData?updateTxt():shoot());hideModal();}
+textBtn.onclick=showModal;textCancel.onclick=hideModal;
+textSubmit.onclick=()=>{userText=textInput.value.trim();userText&&(imgData?drawOnExisting():capture());hideModal();}
 textInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();textSubmit.click()}});
 
-/* ------------ shoot ------------ */
-shutter.onclick=()=>{userText='';shoot();};
-function shoot(){
+/* Capture */
+shutter.onclick=()=>{userText='';capture();}
+function capture(){
   if(!video.videoWidth){alert('Wait for camera');return;}
   const w=video.videoWidth,h=video.videoHeight,b=Math.floor(Math.min(w,h)*0.09),fw=w+b*2,bot=b*2,fh=h+b+bot;
   canvas.width=fw;canvas.height=fh;dim={fw,fh,b,bot};
@@ -140,22 +132,24 @@ function shoot(){
     if(grainAmt){const n=(Math.random()-0.5)*2*grainAmt;r+=n;g+=n;bl+=n}
     d[i]=r;d[i+1]=g;d[i+2]=bl;
   }
-  imgData=data;ctx.putImageData(data,b,b);drawTxt(ctx);
-  photo.src=canvas.toDataURL('image/jpeg',1.0);photo.style.display='block';video.style.display='none';nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
+  imgData=data;ctx.putImageData(data,b,b);addText(ctx);
+  photo.src=canvas.toDataURL('image/jpeg',1.0);photo.style.display='block';video.style.display='none';
+  nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
 }
-function updateTxt(){
-  const{fw,fh,b,bot}=dim;const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);ctx.putImageData(imgData,b,b);drawTxt(ctx);
+function drawOnExisting(){
+  const{fw,fh,b,bot}=dim,ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);ctx.putImageData(imgData,b,b);addText(ctx);
   photo.src=canvas.toDataURL('image/jpeg',1.0);
 }
-function drawTxt(ctx){
+function addText(ctx){
   if(!userText)return;
-  const{fw,fh,bot}=dim;
-  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}
-  ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(userText,fw/2,fh-bot/2);
+  const{fw,fh,bot}=dim;let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;
+  while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}
+  ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(userText,fw/2,fh-bot/2);
 }
 
-/* ------------ save (native toBlob) ------------ */
+/* Save */
 saveBtn.onclick=()=>{
   if(!dim){alert('Take a photo first');return;}
   const{fw,fh}=dim,scale=1810/4420,tmp=document.createElement('canvas');
@@ -163,33 +157,37 @@ saveBtn.onclick=()=>{
   tmp.getContext('2d').drawImage(canvas,0,0,tmp.width,tmp.height);
   tmp.toBlob(blob=>{
     if(!blob){alert('Save failed');return;}
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download=`photo-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(url);
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=`photo-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(url);
     const fr=new FileReader();fr.onloadend=()=>localStorage.setItem(`saved-photo-${Date.now()}`,fr.result);fr.readAsDataURL(blob);
   },'image/jpeg',jpegQ/100);
 };
 
-/* ------------ gallery ------------ */
-document.getElementById('gallery-btn').onclick=()=>{
-  const gal=document.getElementById('gallery-content');gal.innerHTML='';
+/* Gallery & Print */
+document.getElementById('gallery-btn').onclick=showGallery;
+function showGallery(){
+  galleryContent.innerHTML='';
   const keys=Object.keys(localStorage).filter(k=>k.startsWith('saved-photo-')).sort().reverse();
-  if(!keys.length){gal.innerHTML='<p style="color:#fff">No saved images.</p>';}
-  else keys.forEach(k=>{const i=document.createElement('img');i.src=localStorage.getItem(k);i.style.width='100px';gal.appendChild(i);});
-  document.getElementById('gallery-overlay').style.display='block';
+  if(!keys.length)galleryContent.innerHTML='<p style="color:#fff">No saved images.</p>';
+  else keys.forEach(k=>{const i=document.createElement('img');i.src=localStorage.getItem(k);i.style.width='100px';galleryContent.appendChild(i)});
+  galleryOverlay.style.display='block';
+}
+printBtn.onclick=()=>{
+  const imgs=Object.keys(localStorage).filter(k=>k.startsWith('saved-photo-')).sort().reverse();
+  if(!imgs.length){alert('No saved images');return;}
+  const win=window.open('','_blank','width=800,height=600');
+  win.document.write(`<html><head><title>Print</title><style>@page{size:A4;margin:10mm}body{display:flex;flex-wrap:wrap;gap:5mm;margin:0}img{width:calc(50% - 5mm);height:auto}</style></head><body>`);
+  imgs.forEach(k=>win.document.write(`<img src="${localStorage.getItem(k)}">`));
+  win.document.write(`<script>window.onload=()=>{print();onafterprint=()=>close();}</script></body></html>`);
+  win.document.close();
 };
-document.getElementById('menu-exit-btn').onclick=()=>controls.classList.remove('show');
 
-/* ------------ service worker & context menu ------------ */
-if('serviceWorker'in navigator){navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
+/* Service worker & context menu */
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
 document.addEventListener('contextmenu',e=>{if(e.target.id!=='photo')e.preventDefault();},{passive:false});
 
-/* ------------ start ------------ */
+/* Start */
 bootCam();
 </script>
-
-<div id="gallery-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:99;overflow:auto;padding:10px">
-  <button onclick="this.parentNode.style.display='none'" style="position:fixed;top:10px;right:10px;z-index:100;">Close</button>
-  <div id="gallery-content" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:50px"></div>
-</div>
 </body>
 </html>
