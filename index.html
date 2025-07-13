@@ -543,7 +543,7 @@ function renderPhotoWithText() {
   ctx.putImageData(imgData, border, border);
 
   if (userText) {
-  let fontSize = 600;
+  let fontSize = 201;
   ctx.font = `${fontSize}px "Caveat", cursive`;
   let textWidth = ctx.measureText(userText).width;
   while (textWidth > finalW - 20 && fontSize > 16) {
@@ -582,7 +582,7 @@ function updatePhotoText() {
   ctx.putImageData(processedImageData, border, border);
 
   if (userText) {
-    let fontSize = 600;
+    let fontSize = 201;
     ctx.font = `${fontSize}px "Caveat", cursive`;
     let textWidth = ctx.measureText(userText).width;
     while (textWidth > finalW - 20 && fontSize > 16) {
