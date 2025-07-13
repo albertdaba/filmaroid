@@ -132,8 +132,6 @@ menuBtn.onclick     = () => controls.classList.toggle('show');
 nextBtn.onclick     = () => {
     /* NEW — hard-lock viewport */
   document.documentElement.style.overflow = 'hidden';   // root
-  document.body.style.position  = 'fixed';              // freeze body
-  document.body.style.width     = '100%';
   window.scrollTo(0, 0);       
   lockScroll();                           /* keep page locked */
   video.style.display   = 'block';
