@@ -1,6 +1,6 @@
 {
-  "name": "NotFuji",
-  "short_name": "CameraPWA",
+  "name": "LabelCam",
+  "short_name": "LabelCam",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
