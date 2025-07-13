@@ -11,8 +11,7 @@
   <style>
     /* ---------- SHARED STYLES ---------- */
     body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden}
-    /* keep the root element locked too */
-    html{height:100vh;overflow:hidden}
+    html{height:100vh;overflow:hidden}                /* root stays locked */
 
     video,img{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
     #menu-exit-btn,#gallery-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
@@ -108,13 +107,21 @@ const textCancel   = document.getElementById('text-cancel');
 const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
 const cameraRadialMenu    = document.getElementById('cameraRadialMenu');
 
-let stream      = null,
-    grainAmt    = +grainSlider.value,
-    film        = filmSelect.value,
-    jpegQ       = +jpegSlider.value,
-    userText    = '',
-    imgData     = null,
-    dim         = null;
+/* ---------- helpers ---------- */
+function lockScroll(){
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow           = 'hidden';
+  window.scrollTo(0,0);
+}
+
+/* ---------- state ---------- */
+let stream   = null,
+    grainAmt = +grainSlider.value,
+    film     = filmSelect.value,
+    jpegQ    = +jpegSlider.value,
+    userText = '',
+    imgData  = null,
+    dim      = null;
 
 /* ---------- sliders & simple UI ---------- */
 grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; };
@@ -123,11 +130,7 @@ jpegSlider.oninput  = () => { jpegQ  = +jpegSlider.value; jpegVal.textContent = 
 menuBtn.onclick     = () => controls.classList.toggle('show');
 
 nextBtn.onclick     = () => {
-  /* KEEP VIEW LOCKED */
-  document.documentElement.style.overflow = 'hidden';
-  document.body.style.overflow           = 'hidden';
-  window.scrollTo(0,0);
-
+  lockScroll();                           /* keep page locked */
   video.style.display   = 'block';
   photo.style.display   = 'none';
   nextBtn.style.display = 'none';
@@ -247,7 +250,8 @@ function showCameraRadialMenu(){
 
 /* ---------- text modal ---------- */
 function showModal(){ textModal.style.display='flex'; textInput.focus(); }
-function hideModal(){ textModal.style.display='none'; textInput.value=''; }
+function hideModal(){ textModal.style.display='none'; textInput.value=''; lockScroll(); }   /* lock again */
+
 textBtn.onclick     = showModal;
 textCancel.onclick  = hideModal;
 textSubmit.onclick  = () => { userText = textInput.value.trim(); userText && (imgData ? updateTxt() : shoot()); hideModal(); };
@@ -310,6 +314,7 @@ function shoot(){
   nextBtn.style.display = 'block';
   textBtn.style.display = 'block';
   saveBtn.style.display = 'block';
+  lockScroll();                      /* stay locked during preview */
 }
 
 function updateTxt(){
@@ -388,6 +393,7 @@ document.addEventListener('contextmenu', e => { if (e.target.id !== 'photo') e.p
 
 /* ---------- kick things off ---------- */
 bootCam();
+lockScroll();                          /* initial lock */
 </script>
 
 <div id="gallery-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:99;overflow:auto;padding:10px">
