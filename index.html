@@ -74,14 +74,14 @@
 </div>
 
 <div id="gallery-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:99;overflow:auto;padding:10px">
-  <button onclick="galleryOverlay.style.display='none'"
-          style="position:fixed;top:10px;right:10px;z-index:100;">Close</button>
+  <button onclick="galleryOverlay.style.display='none'" style="position:fixed;top:10px;right:10px;z-index:100;">Close</button>
   <div id="gallery-content" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:50px"></div>
 </div>
 
 <script>
 /* ---------- refs & state ---------- */
-const MAX_SIDE=4096;                                     // ≤ iOS canvas / img limit
+const MAX_SIDE=4096;      
+  let currentURL = null;                    // ► keep track of object-URL// ≤ iOS canvas / img limit
 const video=document.getElementById('video');
 const canvas=document.getElementById('canvas');
 const photo=document.getElementById('photo');
@@ -161,7 +161,12 @@ grainSlider.oninput=()=>{grainAmt=+grainSlider.value;grainVal.textContent=grainA
 filmSelect.onchange=()=>film=filmSelect.value;
 jpegSlider.oninput=()=>{jpegQ=+jpegSlider.value;jpegVal.textContent=jpegQ};
 menuBtn.onclick=()=>controls.classList.toggle('show');
-nextBtn.onclick=()=>{video.style.display='block';photo.style.display='none';nextBtn.style.display='none';textBtn.style.display='none';userText='';processedImage=null;dim=null};
+nextBtn.onclick=()=>{
+  video.style.display='block';photo.style.display='none';
+  nextBtn.style.display='none';textBtn.style.display='none';
+  userText='';processedImage=null;dim=null;
+  if(currentURL){ URL.revokeObjectURL(currentURL); currentURL=null; } /* ► clean up */
+};
 cameraSelect.onchange=()=>bootCamera();
 textBtn.onclick=()=>{textModal.style.display='flex';textInput.focus()};
 textCancel.onclick=()=>{textModal.style.display='none';textInput.value=''};
@@ -181,10 +186,8 @@ async function getFullFrameBitmap(){
 
 async function capture(){
   const bmp=await getFullFrameBitmap();
-  /* ---- NEW: auto-scale if sensor > MAX_SIDE ---- */
   const scale=Math.min(1,MAX_SIDE/Math.max(bmp.width,bmp.height));
   const w=Math.round(bmp.width*scale),h=Math.round(bmp.height*scale);
-
   const border=Math.floor(Math.min(w,h)*0.09);
   const fw=w+border*2,bot=border*2,fh=h+border+bot;
 
@@ -193,9 +196,8 @@ async function capture(){
 
   const ctx=canvas.getContext('2d',{alpha:false});
   ctx.fillStyle="#fff";ctx.fillRect(0,0,fw,fh);
-  ctx.drawImage(bmp,border,border,w,h);           // scaled draw
+  ctx.drawImage(bmp,border,border,w,h);
 
-  /* --- film sim & grain on scaled pixels --- */
   const img=ctx.getImageData(border,border,w,h),d=img.data;
   for(let i=0;i<d.length;i+=4){
     let[r,g,b]=[d[i],d[i+1],d[i+2]];
@@ -205,20 +207,29 @@ async function capture(){
     d[i]=r;d[i+1]=g;d[i+2]=b;
   }
   processedImage=img;ctx.putImageData(img,border,border);
-
   addText(ctx);
-  photo.src=canvas.toDataURL('image/jpeg',1.0);
-  photo.style.display='block';video.style.display='none';
-  nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
+
+  /* ► replace data-URI with Blob URL */
+  canvas.toBlob(blob=>{
+    if(currentURL)URL.revokeObjectURL(currentURL);
+    currentURL=URL.createObjectURL(blob);
+    photo.src=currentURL;
+    photo.style.display='block';video.style.display='none';
+    nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
+  },'image/jpeg',0.92);
 }
+
+  
 
 function addText(ctx){
   if(!userText)return;
   const {finalW:fw,finalH:fh,bottomBorder:bot}=dim;
-  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}
+  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;
+  while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}
   ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillText(userText,fw/2,fh-bot/2);
 }
+
 function updateText(){
   const {finalW:fw,finalH:fh,border,bottomBorder:bot}=dim;
   canvas.width=fw;canvas.height=fh;
@@ -226,7 +237,13 @@ function updateText(){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);
   ctx.putImageData(processedImage,border,border);
   addText(ctx);
-  photo.src=canvas.toDataURL('image/jpeg',1.0);
+
+  /* ► regenerate URL after text edit */
+  canvas.toBlob(blob=>{
+    if(currentURL)URL.revokeObjectURL(currentURL);
+    currentURL=URL.createObjectURL(blob);
+    photo.src=currentURL;
+  },'image/jpeg',0.92);
 }
 
 /* ---------- save ---------- */
