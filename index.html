@@ -747,15 +747,15 @@ document.addEventListener('contextmenu', function (e) {
 <script type="module">
 import init, { encode } from './lib/mozjpeg/mozjpeg_enc.js';
 
-await init(); // Load the WASM
+init().then(() => {
+  window.compressCanvasWithMozJPEG = async function(canvas, quality) {
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-async function compressCanvasWithMozJPEG(canvas, quality) {
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  const result = encode(imageData.data, canvas.width, canvas.height, quality);
-  return new Blob([result.buffer], { type: 'image/jpeg' });
-}
+    const result = encode(imageData.data, canvas.width, canvas.height, quality);
+    return new Blob([result.buffer], { type: 'image/jpeg' });
+  };
+});
 </script>
 
 <div id="gallery-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:99; overflow:auto; padding:10px;">
