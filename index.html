@@ -9,6 +9,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
   <style>
+    /* ---------- SHARED STYLES ---------- */
     body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden}
     video,img{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
     #menu-exit-btn,#gallery-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
@@ -16,16 +17,22 @@
     #save-btn{position:fixed;right:20px;top:calc(25% + 50px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
     #menu-btn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:26px;text-align:center;line-height:44px;backdrop-filter:blur(6px);cursor:pointer;z-index:11}
     #next-btn{position:fixed;right:20px;top:25%;transform:translateY(-50%);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;cursor:pointer;display:none;z-index:12}
+
+    /* ---------- RADIAL SELECTOR ---------- */
     #cameraRadialTrigger{position:fixed;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:24px;text-align:center;line-height:44px;cursor:pointer;z-index:20;backdrop-filter:blur(6px);user-select:none;-webkit-user-select:none}
     #cameraRadialMenu{position:fixed;left:44px;top:50%;width:200px;height:200px;margin-left:-20px;margin-top:-100px;pointer-events:none;z-index:21}
-    .camera-option{position:absolute;background:rgba(255,255,255,.15);border:1px solid #fff;color:#fff;padding:6px 12px;border-radius:6px;font-size:14px;cursor:pointer;white-space:nowrap;pointer-events:auto;transform:translate(-50%,-50%);transition:background .2s;transform-origin:left center}
+    .camera-option{position:absolute;background:rgba(255,255,255,.15);border:1px solid #fff;color:#fff;padding:6px 12px;border-radius:6px;font-size:14px;cursor:pointer;white-space:nowrap;pointer-events:auto;transform:translate(-50%,-50%);transition:background .2s}
+
+    /* ---------- OTHER CONTROLS ---------- */
     #controls{position:absolute;bottom:20px;left:50%;transform:translateX(-50%) translateY(100%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;transition:.3s ease;opacity:0;pointer-events:none;display:flex;flex-direction:column;gap:10px;width:calc(100% - 32px);max-width:480px;z-index:20}
-    #photo{user-select:auto;-webkit-user-select:auto;pointer-events:auto}
     #controls.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
+    #photo{user-select:auto;-webkit-user-select:auto;pointer-events:auto}
     input[type=range],select{width:100%}
     label{font-size:14px}
     #cameraSelect{position:fixed;top:12px;left:12px;z-index:15;background:rgba(0,0,0,.7);color:#fff;border:1px solid #fff;border-radius:6px;padding:4px;font-size:16px}
     *{user-select:none;-webkit-user-select:none}
+
+    /* ---------- TEXT OVERLAY ---------- */
     #text-btn{position:fixed;right:20px;bottom:calc(50% + 80px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
     #text-input-modal{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;display:flex;gap:10px;width:calc(100% - 32px);max-width:480px;z-index:25}
     #text-input{flex:1;padding:6px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:16px;user-select:auto;-webkit-user-select:auto}
@@ -43,6 +50,8 @@
 <div id="next-btn">↩ Next</div>
 <button id="save-btn" style="display:none">Save</button>
 <button id="shutter"></button>
+
+<!-- radial selector elements -->
 <div id="cameraRadialTrigger"></div>
 <div id="cameraRadialMenu"></div>
 
@@ -71,150 +80,296 @@
 </div>
 
 <script>
-/* ------- DOM refs & state ------- */
-const video=document.getElementById('video');
-const canvas=document.getElementById('canvas');
-const photo=document.getElementById('photo');
-const shutter=document.getElementById('shutter');
-const saveBtn=document.getElementById('save-btn');
-const nextBtn=document.getElementById('next-btn');
-const menuBtn=document.getElementById('menu-btn');
-const controls=document.getElementById('controls');
-const grainSlider=document.getElementById('grain');
-const grainVal=document.getElementById('grain-val');
-const filmSelect=document.getElementById('film');
-const cameraSelect=document.getElementById('cameraSelect');
-const jpegQualitySlider=document.getElementById('jpeg-quality');
-const jpegQualityVal=document.getElementById('jpeg-quality-val');
-const textBtn=document.getElementById('text-btn');
-const textModal=document.getElementById('text-input-modal');
-const textInput=document.getElementById('text-input');
-const textSubmit=document.getElementById('text-submit');
-const textCancel=document.getElementById('text-cancel');
+/* ---------- DOM refs & state ---------- */
+const video        = document.getElementById('video');
+const canvas       = document.getElementById('canvas');
+const photo        = document.getElementById('photo');
+const shutter      = document.getElementById('shutter');
+const saveBtn      = document.getElementById('save-btn');
+const nextBtn      = document.getElementById('next-btn');
+const menuBtn      = document.getElementById('menu-btn');
+const controls     = document.getElementById('controls');
+const grainSlider  = document.getElementById('grain');
+const grainVal     = document.getElementById('grain-val');
+const filmSelect   = document.getElementById('film');
+const cameraSelect = document.getElementById('cameraSelect');
+const jpegSlider   = document.getElementById('jpeg-quality');
+const jpegVal      = document.getElementById('jpeg-quality-val');
+const textBtn      = document.getElementById('text-btn');
+const textModal    = document.getElementById('text-input-modal');
+const textInput    = document.getElementById('text-input');
+const textSubmit   = document.getElementById('text-submit');
+const textCancel   = document.getElementById('text-cancel');
 
-let currentStream=null,grainAmount=+grainSlider.value,film=filmSelect.value,
-    jpegQuality=+jpegQualitySlider.value,userText='',processedImageData=null,imageDimensions=null;
+/* ----- radial selector refs ----- */
+const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
+const cameraRadialMenu    = document.getElementById('cameraRadialMenu');
 
-/* ------- basic UI ------- */
-grainSlider.oninput=()=>{grainAmount=+grainSlider.value;grainVal.textContent=grainAmount};
-filmSelect.onchange=()=>{film=filmSelect.value};
-jpegQualitySlider.oninput=()=>{jpegQuality=+jpegQualitySlider.value;jpegQualityVal.textContent=jpegQuality};
-menuBtn.onclick=()=>controls.classList.toggle('show');
-nextBtn.onclick=()=>{video.style.display='block';photo.style.display='none';nextBtn.style.display='none';textBtn.style.display='none';userText='';processedImageData=null;imageDimensions=null};
+let stream      = null,
+    grainAmt    = +grainSlider.value,
+    film        = filmSelect.value,
+    jpegQ       = +jpegSlider.value,
+    userText    = '',
+    imgData     = null,
+    dim         = null;
 
-/* ------- camera ------- */
-cameraSelect.onchange=()=>startCamera(cameraSelect.value);
-async function startCamera(deviceId=null){
-  if(currentStream)currentStream.getTracks().forEach(t=>t.stop());
-  const constraints={video:deviceId?{deviceId:{exact:deviceId},width:{ideal:4096},height:{ideal:2160}}:{facingMode:{exact:'environment'},width:{ideal:4096},height:{ideal:2160}}};
+/* ---------- sliders & simple UI ---------- */
+grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; };
+filmSelect.onchange = () => { film = filmSelect.value; };
+jpegSlider.oninput  = () => { jpegQ  = +jpegSlider.value; jpegVal.textContent = jpegQ; };
+menuBtn.onclick     = () => controls.classList.toggle('show');
+nextBtn.onclick     = () => { video.style.display='block'; photo.style.display='none'; nextBtn.style.display='none'; textBtn.style.display='none'; imgData=null; dim=null; userText=''; };
+
+/* ---------- camera core ---------- */
+cameraSelect.onchange = () => bootCam(cameraSelect.value);
+
+async function bootCam(id = null){
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  const c = { video: id
+                ? { deviceId:{exact:id}, width:{ideal:4096}, height:{ideal:2160} }
+                : { facingMode:{exact:'environment'}, width:{ideal:4096}, height:{ideal:2160} } };
   try{
-    currentStream=await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject=currentStream;await video.play();await populateCameraOptions();
-  }catch(e){alert('Camera Error: '+(e.name==='NotAllowedError'?'Camera access denied':e.message));}
-}
-async function populateCameraOptions(){
-  const vids=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
-  cameraSelect.innerHTML='';vids.forEach((d,i)=>{const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||`Camera ${i+1}`;cameraSelect.appendChild(o)});
-}
-
-/* ------- radial menu (unchanged) ------- */
-const cameraRadialTrigger=document.getElementById('cameraRadialTrigger');
-const cameraRadialMenu=document.getElementById('cameraRadialMenu');
-let radialTimeout=null,radialActive=false,currentHovered=null;
-cameraRadialTrigger.addEventListener('pointerdown',()=>{radialTimeout=setTimeout(()=>{showRadial();radialActive=true},300)});
-document.addEventListener('pointermove',e=>{
-  if(!radialActive)return;
-  let closest=null,min=Infinity;
-  document.querySelectorAll('.camera-option').forEach(opt=>{
-    const r=opt.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),dist=Math.hypot(dx,dy);
-    if(dist<min&&dist<80){min=dist;closest=opt}opt.style.background='rgba(255,255,255,.15)';
-  });
-  currentHovered=closest;if(closest)closest.style.background='rgba(255,255,255,.4)';
-});
-document.addEventListener('pointerup',()=>{clearTimeout(radialTimeout);if(radialActive){if(currentHovered){cameraSelect.value=currentHovered.dataset.id;startCamera(currentHovered.dataset.id)}cameraRadialMenu.innerHTML='';radialActive=false}});
-function showRadial(){
-  cameraRadialMenu.innerHTML='';
-  const opts=[...cameraSelect.options],n=opts.length,clamp=Math.max(1,Math.min(7,n)),start=-Math.PI/4,end=Math.PI/4,spread=end-start,r=90+(clamp-1)*6;
-  opts.forEach((o,i)=>{const a=start+i*spread/(clamp-1||1),x=Math.cos(a)*r+100,y=Math.sin(a)*r+100,d=document.createElement('div');d.className='camera-option';d.style.left=`${x}px`;d.style.top=`${y}px`;d.textContent=o.textContent;d.dataset.id=o.value;cameraRadialMenu.appendChild(d)});
-}
-
-/* ------- text modal ------- */
-function showText(){textModal.style.display='flex';textInput.focus()}
-function hideText(){textModal.style.display='none';textInput.value=''}
-textBtn.onclick=showText;
-textSubmit.onclick=()=>{userText=textInput.value.trim();userText&&(processedImageData?updateText():renderPhoto());hideText();}
-textCancel.onclick=hideText;
-textInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();textSubmit.click()}});
-
-/* ------- capture & render ------- */
-shutter.onclick=()=>{userText='';renderPhoto();};
-function renderPhoto(){
-  if(!video.videoWidth){alert('Video not ready');return;}
-  const w=video.videoWidth,h=video.videoHeight,b=Math.floor(Math.min(w,h)*0.09),fw=w+b*2,bot=b*2,fh=h+b+bot;
-  canvas.width=fw;canvas.height=fh;imageDimensions={w,h,border:b,finalW:fw,bottomBorder:bot,finalH:fh};
-  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);ctx.drawImage(video,b,b,w,h);
-  const img=ctx.getImageData(b,b,w,h),d=img.data;
-  for(let i=0;i<d.length;i+=4){
-    let[r,g,bl]=[d[i],d[i+1],d[i+2]];
-    if(film==='acros'){const a=(r+g+bl)/3;r=g=bl=a}else if(film==='kodachrome'){const a=(r+g+bl)/3;r=r*.85+a*.15;g=g*.85+a*.15;bl=bl*.85+a*.15}
-    if(grainAmount){const n=(Math.random()-0.5)*2*grainAmount;r+=n;g+=n;bl+=n}
-    d[i]=Math.max(0,Math.min(255,r));d[i+1]=Math.max(0,Math.min(255,g));d[i+2]=Math.max(0,Math.min(255,bl));
+    stream = await navigator.mediaDevices.getUserMedia(c);
+    video.srcObject = stream;
+    await video.play();
+    await cams();
+  }catch(e){
+    alert('Camera error: ' + e.message);
   }
-  processedImageData=img;ctx.putImageData(img,b,b);
-  if(userText){let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(userText,fw/2,fh-bot/2);}
-  photo.src=canvas.toDataURL('image/jpeg',1.0);photo.style.display='block';video.style.display='none';nextBtn.style.display='block';textBtn.style.display='block';saveBtn.style.display='block';
-}
-function updateText(){
-  const{finalW:fw,finalH:fh,bottomBorder:bot,border:b}=imageDimensions;
-  canvas.width=fw;canvas.height=fh;
-  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,fw,fh);ctx.putImageData(processedImageData,b,b);
-  let fs=131;ctx.font=`${fs}px "Mrs Saint Delafield"`;while(ctx.measureText(userText).width>fw-20&&fs>16){fs--;ctx.font=`${fs}px "Mrs Saint Delafield"`}ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(userText,fw/2,fh-bot/2);
-  photo.src=canvas.toDataURL('image/jpeg',1.0);
 }
 
-/* ------- SAVE (await WASM) ------- */
-saveBtn.onclick=async()=>{
-  if(!processedImageData)return;
-  await window.mozjpegReady;
-  const{finalW:fw,finalH:fh}=imageDimensions,scale=1810/4420;
-  const temp=document.createElement('canvas');temp.width=Math.floor(fw*scale);temp.height=Math.floor(fh*scale);
-  temp.getContext('2d').drawImage(canvas,0,0,temp.width,temp.height);
-  const blob=await compressCanvasWithMozJPEG(temp,jpegQuality);
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`photo-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(url);
-  const r=new FileReader();r.onloadend=()=>localStorage.setItem(`saved-photo-${Date.now()}`,r.result);r.readAsDataURL(blob);
-};
+async function cams(){
+  const v = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+  const current = cameraSelect.value;
+  cameraSelect.innerHTML = '';
+  v.forEach((d,i) => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || `Camera ${i+1}`;
+    cameraSelect.appendChild(o);
+  });
+  if (current) cameraSelect.value = current;
+}
 
-/* ------- gallery ------- */
-document.getElementById('gallery-btn').onclick=()=>{
-  const gal=document.getElementById('gallery-content');gal.innerHTML='';
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith('saved-photo-')).sort().reverse();
-  if(!keys.length)gal.innerHTML='<p style="color:white;">No saved images.</p>';
-  else keys.forEach(k=>{const img=document.createElement('img');img.src=localStorage.getItem(k);img.style.width='100px';gal.appendChild(img);});
-  document.getElementById('gallery-overlay').style.display='block';
-};
-document.getElementById('menu-exit-btn').onclick=()=>controls.classList.remove('show');
+/* ---------- radial-selector logic ---------- */
+let radialTimeout       = null;
+let radialActive        = false;
+let currentHoveredOpt   = null;
 
-/* ------- boot ------- */
-startCamera();
-</script>
-
-<script>
-if('serviceWorker'in navigator){navigator.serviceWorker.register('./service-worker.js').then(reg=>{reg.onupdatefound=()=>{const nw=reg.installing;nw.onstatechange=()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)alert('New update available! Please refresh.');};};});}
-document.addEventListener('contextmenu',e=>{if(e.target.id!=='photo')e.preventDefault();},{passive:false});
-</script>
-
-<!-- ------- mozjpeg WASM (global promise) ------- -->
-<script type="module">
-import init,{encode}from'./lib/mozjpeg/mozjpeg_enc.js';
-let res;window.mozjpegReady=new Promise(r=>res=r);
-init().then(()=>{
-  window.compressCanvasWithMozJPEG=async(c,q)=>{
-    const ctx=c.getContext('2d'),img=ctx.getImageData(0,0,c.width,c.height);
-    const out=encode(img.data,c.width,c.height,q);
-    return new Blob([out.buffer],{type:'image/jpeg'});
-  };
-  res(); /* resolve */
+cameraRadialTrigger.addEventListener('pointerdown', () => {
+  radialTimeout = setTimeout(() => {
+    showCameraRadialMenu();
+    radialActive = true;
+  }, 300);           // long-press threshold
 });
+
+document.addEventListener('pointermove', e => {
+  if (!radialActive) return;
+
+  const opts    = document.querySelectorAll('.camera-option');
+  let   closest = null;
+  let   minDist = Infinity;
+
+  opts.forEach(opt => {
+    const r  = opt.getBoundingClientRect();
+    const cx = r.left + r.width/2;
+    const cy = r.top  + r.height/2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+    const d  = Math.hypot(dx,dy);
+
+    if (d < minDist && d < 80){ minDist = d; closest = opt; }
+    opt.style.background = 'rgba(255,255,255,0.15)';
+  });
+
+  currentHoveredOpt = closest;
+  if (closest) closest.style.background = 'rgba(255,255,255,0.4)';
+});
+
+document.addEventListener('pointerup', () => {
+  clearTimeout(radialTimeout);
+
+  if (radialActive){
+    if (currentHoveredOpt){
+      const id = currentHoveredOpt.getAttribute('data-device-id');
+      cameraSelect.value = id;
+      bootCam(id);
+    }
+    cameraRadialMenu.innerHTML = '';
+    radialActive      = false;
+    currentHoveredOpt = null;
+  }
+});
+
+function showCameraRadialMenu(){
+  cameraRadialMenu.innerHTML = '';
+
+  const opts      = Array.from(cameraSelect.options);
+  const count     = opts.length;
+  const showCnt   = Math.max(1, Math.min(7, count));     // cap 7
+  const startA    = -Math.PI/4;                          // -45°
+  const endA      =  Math.PI/4;                          // +45°
+  const spread    = endA - startA;
+  const radius    = 90 + (showCnt - 1) * 6;
+
+  opts.forEach((o, idx) => {
+    const ang = startA + idx * (spread / (showCnt - 1 || 1));
+    const x   = Math.cos(ang) * radius + 100;
+    const y   = Math.sin(ang) * radius + 100;
+
+    const btn = document.createElement('div');
+    btn.className = 'camera-option';
+    btn.style.left      = `${x}px`;
+    btn.style.top       = `${y}px`;
+    btn.textContent     = o.textContent;
+    btn.setAttribute('data-device-id', o.value);
+    cameraRadialMenu.appendChild(btn);
+  });
+}
+
+/* ---------- text modal ---------- */
+function showModal(){ textModal.style.display='flex'; textInput.focus(); }
+function hideModal(){ textModal.style.display='none'; textInput.value=''; }
+textBtn.onclick     = showModal;
+textCancel.onclick  = hideModal;
+textSubmit.onclick  = () => { userText = textInput.value.trim(); userText && (imgData ? updateTxt() : shoot()); hideModal(); };
+textInput.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); textSubmit.click(); }});
+
+/* ---------- shoot ---------- */
+shutter.onclick = () => { userText=''; shoot(); };
+
+function shoot(){
+  if (!video.videoWidth){ alert('Wait for camera'); return; }
+
+  const w   = video.videoWidth,
+        h   = video.videoHeight,
+        b   = Math.floor(Math.min(w,h) * 0.09),
+        fw  = w + b*2,
+        bot = b*2,
+        fh  = h + b + bot;
+
+  canvas.width  = fw;
+  canvas.height = fh;
+  dim           = {fw, fh, b, bot};
+
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,fw,fh);
+  ctx.drawImage(video, b, b, w, h);
+
+  const data = ctx.getImageData(b,b,w,h);
+  const d    = data.data;
+
+  for (let i=0; i<d.length; i+=4){
+    let [r,g,bl] = [d[i], d[i+1], d[i+2]];
+
+    if (film === 'acros'){
+      const a = (r+g+bl)/3;
+      r = g = bl = a;
+    }else{
+      const a = (r+g+bl)/3;
+      r = r*.85 + a*.15;
+      g = g*.85 + a*.15;
+      bl= bl*.85+ a*.15;
+    }
+    if (grainAmt){
+      const n = (Math.random() - .5) * 2 * grainAmt;
+      r += n; g += n; bl += n;
+    }
+
+    d[i]   = r;
+    d[i+1] = g;
+    d[i+2] = bl;
+  }
+
+  imgData = data;
+  ctx.putImageData(data, b, b);
+  drawTxt(ctx);
+
+  photo.src           = canvas.toDataURL('image/jpeg', 1.0);
+  photo.style.display = 'block';
+  video.style.display = 'none';
+  nextBtn.style.display = 'block';
+  textBtn.style.display = 'block';
+  saveBtn.style.display = 'block';
+}
+
+function updateTxt(){
+  const {fw, fh, b, bot} = dim;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,fw,fh);
+  ctx.putImageData(imgData, b, b);
+  drawTxt(ctx);
+  photo.src = canvas.toDataURL('image/jpeg', 1.0);
+}
+
+function drawTxt(ctx){
+  if (!userText) return;
+  const {fw, fh, bot} = dim;
+  let fs = 131;
+  ctx.font = `${fs}px "Mrs Saint Delafield"`;
+  while (ctx.measureText(userText).width > fw-20 && fs > 16){
+    fs--;
+    ctx.font = `${fs}px "Mrs Saint Delafield"`;
+  }
+  ctx.fillStyle   = '#000';
+  ctx.textAlign   = 'center';
+  ctx.textBaseline= 'middle';
+  ctx.fillText(userText, fw/2, fh - bot/2);
+}
+
+/* ---------- save ---------- */
+saveBtn.onclick = () => {
+  if (!dim){ alert('Take a photo first'); return; }
+  const {fw, fh} = dim,
+        scale    = 1810/4420,
+        tmp      = document.createElement('canvas');
+
+  tmp.width  = Math.floor(fw*scale);
+  tmp.height = Math.floor(fh*scale);
+  tmp.getContext('2d').drawImage(canvas,0,0,tmp.width,tmp.height);
+
+  tmp.toBlob(blob => {
+    if (!blob){ alert('Save failed'); return; }
+    const a   = document.createElement('a');
+    a.href    = URL.createObjectURL(blob);
+    a.download= `photo-${Date.now()}.jpg`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    const fr = new FileReader();
+    fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result);
+    fr.readAsDataURL(blob);
+  }, 'image/jpeg', jpegQ/100);
+};
+
+/* ---------- gallery ---------- */
+document.getElementById('gallery-btn').onclick = () => {
+  const gal  = document.getElementById('gallery-content');
+  gal.innerHTML = '';
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('saved-photo-')).sort().reverse();
+
+  if (!keys.length){
+    gal.innerHTML = '<p style="color:#fff">No saved images.</p>';
+  }else{
+    keys.forEach(k => {
+      const i = document.createElement('img');
+      i.src   = localStorage.getItem(k);
+      i.style.width = '100px';
+      gal.appendChild(i);
+    });
+  }
+  document.getElementById('gallery-overlay').style.display = 'block';
+};
+document.getElementById('menu-exit-btn').onclick = () => controls.classList.remove('show');
+
+/* ---------- service worker & context menu ---------- */
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+document.addEventListener('contextmenu', e => { if (e.target.id !== 'photo') e.preventDefault(); }, {passive:false});
+
+/* ---------- kick things off ---------- */
+bootCam();
 </script>
 
 <div id="gallery-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:99;overflow:auto;padding:10px">
