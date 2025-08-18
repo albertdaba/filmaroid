@@ -14,7 +14,7 @@
     html{height:100vh;overflow:hidden}
 
     video,canvas,#photo{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
-    #menu-exit-btn,#gallery-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
+    #menu-exit-btn,#gallery-btn,#calibrate-btn,#save-profile-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
     #shutter{position:fixed;right:20px;bottom:50%;transform:translateY(50%);width:70px;height:70px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.1);cursor:pointer;z-index:10}
     #save-btn{position:fixed;bottom:20px;left:calc(50% + 100px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
     #menu-btn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:26px;text-align:center;line-height:44px;backdrop-filter:blur(6px);cursor:pointer;z-index:11}
@@ -49,6 +49,7 @@
 
     /* ---------- PROCESSING OVERLAY ---------- */
     #processing{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:30;font-size:16px}
+    #hint{font-size:12px;opacity:.8}
   </style>
 </head>
 <body>
@@ -107,6 +108,29 @@
   </div>
   <!-- —— /COLOR MIX —— -->
 
+  <!-- —— NEW: CALIBRATION ENTRY —— -->
+  <div class="divider"></div>
+  <button id="calibrate-btn" title="Capture a calibration shot, then fine-tune">Color Calibration</button>
+  <div id="hint" style="display:none;">Calibration armed: snap a photo to open calibration sliders.</div>
+
+  <!-- —— NEW: CALIBRATION PANEL —— -->
+  <div id="calibration-panel" style="display:none">
+    <div class="divider"></div>
+    <strong>Calibration</strong>
+    <label>White Balance – Red (-8…+8): <span id="wb-r-val">0</span>
+      <input type="range" id="wb-r" min="-8" max="8" value="0">
+    </label>
+    <label>White Balance – Blue (-8…+8): <span id="wb-b-val">0</span>
+      <input type="range" id="wb-b" min="-8" max="8" value="0">
+    </label>
+    <label>Vignette (0…100): <span id="vig-val">0</span>
+      <input type="range" id="vignette" min="0" max="100" value="0">
+    </label>
+    <div class="row">
+      <button id="save-profile-btn" title="Save current mix + WB + grain + vignette as a profile">Save as Film Profile</button>
+    </div>
+  </div>
+
   <button id="menu-exit-btn">Exit Menu</button>
   <button id="gallery-btn">View Gallery</button>
 </div>
@@ -141,6 +165,17 @@ const textInput    = document.getElementById('text-input');
 const textSubmit   = document.getElementById('text-submit');
 const textCancel   = document.getElementById('text-cancel');
 
+const calibrateBtn = document.getElementById('calibrate-btn');
+const calibrationPanel = document.getElementById('calibration-panel');
+const hintEl = document.getElementById('hint');
+const wbRSlider = document.getElementById('wb-r');
+const wbBSlider = document.getElementById('wb-b');
+const wbRVal = document.getElementById('wb-r-val');
+const wbBVal = document.getElementById('wb-b-val');
+const vignetteSlider = document.getElementById('vignette');
+const vigVal = document.getElementById('vig-val');
+const saveProfileBtn = document.getElementById('save-profile-btn');
+
 /* ----- radial selector refs ----- */
 const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
 const cameraRadialMenu    = document.getElementById('cameraRadialMenu');
@@ -174,6 +209,13 @@ let stream   = null,
     dim      = null,
     lastFrameImageData = null; // processed pixels
 
+/* ---------- Calibration state ---------- */
+let calibrationArmed = false; // true after tapping "Color Calibration"
+let activeProfileName = null; // when selecting a saved profile
+
+const PROFILE_KEY = 'filmProfilesV1';
+let profiles = {}; // name -> settings
+
 /* ---------- COLOR MIX state ---------- */
 const CM_KEY = 'colorMixSettingsV1';
 const colors = [
@@ -197,9 +239,31 @@ try{
   }
 }catch{}
 
+/* ---------- NEW: WB/Vignette state ---------- */
+const WB_KEY = 'wbSettingsV1';
+let wb = { r:0, b:0 }; // -8..+8 each
+let vignetteAmt = 0;   // 0..100
+try{
+  const savedWB = JSON.parse(localStorage.getItem(WB_KEY));
+  if (savedWB && typeof savedWB.r === 'number' && typeof savedWB.b === 'number') wb = savedWB;
+}catch{}
+try{
+  const savedVig = +localStorage.getItem('vignetteAmtV1');
+  if (!isNaN(savedVig)) vignetteAmt = savedVig;
+}catch{}
+
 /* ---------- sliders & simple UI ---------- */
 grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; };
-filmSelect.onchange = () => { film = filmSelect.value; };
+filmSelect.onchange = () => {
+  const v = filmSelect.value;
+  if (v.startsWith('profile:')){
+    activeProfileName = v.slice(8);
+    applyProfileToUI(activeProfileName);
+  }else{
+    activeProfileName = null;
+    film = v;
+  }
+};
 jpegSlider.oninput  = () => { jpegQ  = +jpegSlider.value; jpegVal.textContent = jpegQ; };
 menuBtn.onclick     = () => controls.classList.toggle('show');
 
@@ -234,6 +298,107 @@ cmL.addEventListener('input', () => { cmState.dL[cmIdx] = (+cmL.value)/200; cmLV
 cmReset.addEventListener('click', () => { cmState.dH.fill(0); cmState.dS.fill(0); cmState.dL.fill(0); saveCmState(); refreshCmControls(); });
 buildPalette(); refreshCmControls();
 
+/* ---------- NEW: Calibration UI wiring ---------- */
+function refreshWBUI(){
+  wbRSlider.value = wb.r; wbBSlider.value = wb.b;
+  wbRVal.textContent = wb.r; wbBVal.textContent = wb.b;
+}
+function refreshVignetteUI(){
+  vignetteSlider.value = vignetteAmt;
+  vigVal.textContent = vignetteAmt;
+}
+function saveWB(){ localStorage.setItem(WB_KEY, JSON.stringify(wb)); }
+function saveVignette(){ localStorage.setItem('vignetteAmtV1', String(vignetteAmt)); }
+
+wbRSlider.oninput = () => { wb.r = +wbRSlider.value; wbRVal.textContent = wb.r; saveWB(); if (lastFrameImageData) shootReprocess(); };
+wbBSlider.oninput = () => { wb.b = +wbBSlider.value; wbBVal.textContent = wb.b; saveWB(); if (lastFrameImageData) shootReprocess(); };
+vignetteSlider.oninput = () => { vignetteAmt = +vignetteSlider.value; vigVal.textContent = vignetteAmt; saveVignette(); if (lastFrameImageData) shootReprocess(); };
+
+calibrateBtn.onclick = () => {
+  calibrationArmed = true;
+  hintEl.style.display = 'block';
+  controls.classList.remove('show');
+  // ensure color mix visible during calibration
+  cmState.enable = true; saveCmState(); refreshCmControls();
+};
+
+function openCalibrationPanel(){
+  controls.classList.add('show');
+  calibrationPanel.style.display = 'block';
+  refreshWBUI(); refreshVignetteUI();
+}
+
+saveProfileBtn.onclick = () => {
+  const name = (prompt('Profile name?') || '').trim();
+  if (!name) return;
+  const settings = {
+    filmBase: filmSelect.value.startsWith('profile:') ? 'kodachrome' : filmSelect.value,
+    cmState,
+    grainAmt,
+    wb,
+    vignetteAmt
+  };
+  profiles[name] = settings;
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
+  populateProfiles();
+  // auto-select it
+  filmSelect.value = 'profile:' + name;
+  activeProfileName = name;
+  alert('Saved profile: ' + name);
+};
+
+/* ---------- Profiles load/apply ---------- */
+function populateProfiles(){
+  // ensure an optgroup exists
+  let group = filmSelect.querySelector('optgroup[label="Custom Profiles"]');
+  if (!group){
+    group = document.createElement('optgroup');
+    group.label = 'Custom Profiles';
+    filmSelect.appendChild(group);
+  }
+  group.innerHTML = '';
+  Object.keys(profiles).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = 'profile:' + name;
+    opt.textContent = 'Profile: ' + name;
+    group.appendChild(opt);
+  });
+}
+
+function loadProfiles(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(PROFILE_KEY));
+    if (raw && typeof raw === 'object') profiles = raw;
+  }catch{}
+  populateProfiles();
+}
+
+function applyProfileToUI(name){
+  const p = profiles[name];
+  if (!p) return;
+  // Set base film but keep select on profile
+  film = p.filmBase || 'kodachrome';
+  grainAmt = typeof p.grainAmt === 'number' ? p.grainAmt : grainAmt;
+  grainSlider.value = grainAmt; grainVal.textContent = grainAmt;
+
+  if (p.cmState){
+    cmState = JSON.parse(JSON.stringify(p.cmState));
+    saveCmState();
+    refreshCmControls();
+    buildPalette();
+  }
+  if (p.wb){
+    wb = { r: p.wb.r|0, b: p.wb.b|0 };
+    saveWB(); refreshWBUI();
+  }
+  if (typeof p.vignetteAmt === 'number'){
+    vignetteAmt = p.vignetteAmt|0;
+    saveVignette(); refreshVignetteUI();
+  }
+  // reprocess if a frame exists
+  if (lastFrameImageData) shootReprocess();
+}
+
 /* ---------- NEXT / MENU ---------- */
 nextBtn.onclick = () => {
   document.documentElement.style.overflow = 'hidden';
@@ -250,6 +415,9 @@ nextBtn.onclick = () => {
   lastFrameImageData = null;
   dim = null;
   userText = '';
+  hintEl.style.display = 'none';
+  calibrationPanel.style.display = 'none';
+  calibrationArmed = false;
 };
 
 /* ---------- camera core ---------- */
@@ -362,7 +530,7 @@ textInput.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDe
 /* ---------- Worker (inline via Blob) ---------- */
 const workerSrc = `
 self.onmessage = (e) => {
-  const { imageData, film, grainAmt, cmState, colors, hueWidth } = e.data;
+  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt } = e.data;
   const d = imageData.data;
   const useColorMix = cmState.enable && film !== 'acros';
 
@@ -412,44 +580,71 @@ self.onmessage = (e) => {
     return ((seed>>>0) / 0x7fffffff) * 2 - 1;
   }
 
-  for (let i=0; i<d.length; i+=4){
-    let r = d[i], g = d[i+1], bl = d[i+2];
+  // White balance gains from UI steps (-8..+8). Each step ~6% gain.
+  const gainR = 1 + (wb.r || 0) * 0.06;
+  const gainB = 1 + (wb.b || 0) * 0.06;
 
-    if (film === 'acros'){
-      const a = (r+g+bl)/3; r=g=bl=a;
-    }else{
-      const a = (r+g+bl)/3;
-      r = r*.85 + a*.15; g = g*.85 + a*.15; bl = bl*.85 + a*.15;
-    }
+  // Vignette setup
+  const W = imageData.width, H = imageData.height;
+  const cx = W * 0.5, cy = H * 0.5;
+  const maxR = Math.min(W, H) * 0.5;
+  const vigPower = (vignetteAmt||0) / 100; // 0..1
 
-    if (useColorMix){
-      let [h, s, v] = rgbToHsv(r,g,bl);
-      let dH=0, dS=0, dL=0, sumW=0;
-      for (let k=0; k<8; k++){
-        const w = bucketWeight(h, s, colors[k].center, hueWidth[k]);
-        if (w>0){
-          sumW += w;
-          dH += w * (cmState.dH[k] || 0);
-          dS += w * (cmState.dS[k] || 0);
-          dL += w * (cmState.dL[k] || 0);
+  for (let y=0; y<H; y++){
+    for (let x=0; x<W; x++){
+      const i = (y*W + x) * 4;
+      let r = d[i], g = d[i+1], bl = d[i+2];
+
+      if (film === 'acros'){
+        const a = (r+g+bl)/3; r=g=bl=a;
+      }else{
+        const a = (r+g+bl)/3;
+        r = r*.85 + a*.15; g = g*.85 + a*.15; bl = bl*.85 + a*.15;
+      }
+
+      if (useColorMix){
+        let [h, s, v] = rgbToHsv(r,g,bl);
+        let dH=0, dS=0, dL=0, sumW=0;
+        for (let k=0; k<8; k++){
+          const w = bucketWeight(h, s, colors[k].center, hueWidth[k]);
+          if (w>0){
+            sumW += w;
+            dH += w * (cmState.dH[k] || 0);
+            dS += w * (cmState.dS[k] || 0);
+            dL += w * (cmState.dL[k] || 0);
+          }
+        }
+        if (sumW>0){
+          h = h + dH;
+          s = Math.max(0, Math.min(1, s + dS));
+          v = Math.max(0, Math.min(1, v + dL));
+          [r,g,bl] = hsvToRgb(h,s,v);
         }
       }
-      if (sumW>0){
-        h = h + dH;
-        s = Math.max(0, Math.min(1, s + dS));
-        v = Math.max(0, Math.min(1, v + dL));
-        [r,g,bl] = hsvToRgb(h,s,v);
+
+      // White balance (channel gains)
+      r = r * gainR;
+      bl = bl * gainB;
+
+      // Grain
+      if (grainAmt){
+        const n = fastNoise() * grainAmt;
+        r += n; g += n; bl += n;
       }
-    }
 
-    if (grainAmt){
-      const n = fastNoise() * grainAmt;
-      r += n; g += n; bl += n;
-    }
+      // Vignette (quadratic falloff)
+      if (vigPower > 0){
+        const dx = x - cx, dy = y - cy;
+        const rr = Math.sqrt(dx*dx + dy*dy) / maxR; // 0..~1.4
+        const fall = Math.min(1, Math.max(0, rr));
+        const vFactor = 1 - vigPower * (fall*fall);
+        r *= vFactor; g *= vFactor; bl *= vFactor;
+      }
 
-    d[i]   = r;
-    d[i+1] = g;
-    d[i+2] = bl;
+      d[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
+      d[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
+      d[i+2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
+    }
   }
 
   self.postMessage({ imageData }, [imageData.data.buffer]);
@@ -493,13 +688,16 @@ async function shoot(){
   // 3) Kick off processing in a worker
   const roi = ctx.getImageData(b,b,w,h);
   processingEl.style.display = 'flex';
+  const effective = getEffectiveSettings();
   worker.postMessage({
     imageData: roi,
-    film,
-    grainAmt,
-    cmState,
+    film: effective.filmBase,
+    grainAmt: effective.grainAmt,
+    cmState: effective.cmState,
     colors,
-    hueWidth
+    hueWidth,
+    wb: effective.wb,
+    vignetteAmt: effective.vignetteAmt
   }, [roi.data.buffer]);
 
   worker.onmessage = (e) => {
@@ -509,6 +707,62 @@ async function shoot(){
     lastFrameImageData = ctx.getImageData(0,0,fw,fh); // for text overlay update
     drawTxt(ctx);
     processingEl.style.display = 'none';
+
+    // If calibration was armed, open the panel after this shot
+    if (calibrationArmed){
+      controls.classList.add('show');
+      calibrationPanel.style.display = 'block';
+      hintEl.style.display = 'none';
+      calibrationArmed = false;
+    }
+  };
+}
+
+/* ---------- reprocess current frame with new settings (no new capture) ---------- */
+function shootReprocess(){
+  if (!dim) return;
+  const {fw, fh, b} = dim;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const roi = ctx.getImageData(b,b, canvas.width - b*2, canvas.height - b*2 - (dim.bot - b));
+  processingEl.style.display = 'flex';
+  const effective = getEffectiveSettings();
+  worker.postMessage({
+    imageData: roi,
+    film: effective.filmBase,
+    grainAmt: effective.grainAmt,
+    cmState: effective.cmState,
+    colors,
+    hueWidth,
+    wb: effective.wb,
+    vignetteAmt: effective.vignetteAmt
+  }, [roi.data.buffer]);
+  worker.onmessage = (e) => {
+    const { imageData } = e.data;
+    ctx.putImageData(imageData, b, b);
+    lastFrameImageData = ctx.getImageData(0,0,fw,fh);
+    drawTxt(ctx);
+    processingEl.style.display = 'none';
+  };
+}
+
+/* ---------- resolve settings (handles profiles) ---------- */
+function getEffectiveSettings(){
+  if (activeProfileName && profiles[activeProfileName]){
+    const p = profiles[activeProfileName];
+    return {
+      filmBase: p.filmBase || 'kodachrome',
+      grainAmt: p.grainAmt,
+      cmState : p.cmState || cmState,
+      wb      : p.wb || wb,
+      vignetteAmt: typeof p.vignetteAmt === 'number' ? p.vignetteAmt : 0
+    };
+  }
+  return {
+    filmBase: film,
+    grainAmt,
+    cmState,
+    wb,
+    vignetteAmt
   };
 }
 
@@ -517,7 +771,6 @@ function updateTxt(){
   if (!dim){ return; }
   const {fw, fh, b, bot} = dim;
   const ctx = canvas.getContext('2d');
-  // If we saved the processed frame, re-draw it; otherwise no-op (should be set).
   if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
   drawTxt(ctx);
 }
@@ -536,7 +789,6 @@ function drawTxt(ctx){
   ctx.textAlign   = 'center';
   ctx.textBaseline= 'middle';
   ctx.fillText(userText, fw/2, fh - bot/2);
-  // refresh cached imageData for save consistency
   lastFrameImageData = ctx.getImageData(0,0,fw,fh);
 }
 
@@ -591,6 +843,9 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-wo
 document.addEventListener('contextmenu', e => { if (e.target.id !== 'photo') e.preventDefault(); }, {passive:false});
 
 /* ---------- kick things off ---------- */
+loadProfiles();
+refreshWBUI();
+refreshVignetteUI();
 bootCam();
 lockScroll();
 </script>
