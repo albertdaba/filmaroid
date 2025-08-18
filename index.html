@@ -10,149 +10,242 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
   <style>
     /* ---------- SHARED STYLES ---------- */
-    body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+    body{margin:0;background:#000;color:#fff;font-family:sans-serif;height:100vh;overflow:hidden}
     html{height:100vh;overflow:hidden}
 
-    video,canvas,#photo{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
-    #menu-exit-btn,#gallery-btn,#calibrate-btn,#save-profile-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
-    #shutter{position:fixed;right:20px;bottom:50%;transform:translateY(50%);width:70px;height:70px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.1);cursor:pointer;z-index:10}
-    #save-btn{position:fixed;bottom:20px;left:calc(50% + 100px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
-    #menu-btn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:26px;text-align:center;line-height:44px;backdrop-filter:blur(6px);cursor:pointer;z-index:11}
-    #next-btn{position:fixed;right:20px;top:25%;transform:translateY(-50%);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;cursor:pointer;display:none;z-index:12}
+    /* Stage */
+    #stage{position:fixed;inset:0;display:grid;grid-template-columns:1fr auto}
+    /* Keep video/canvas centered and BIG */
+    #view{display:flex;align-items:center;justify-content:center}
+    video,canvas,#photo{width:min(100%, 480px);aspect-ratio:3/4;object-fit:contain;background:#000}
 
-    /* ---------- RADIAL SELECTOR ---------- */
+    /* Floating capture controls */
+    #shutter{position:fixed;right:20px;bottom:50%;transform:translateY(50%);width:70px;height:70px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.1);cursor:pointer;z-index:10}
+    #next-btn{position:fixed;right:20px;top:25%;transform:translateY(-50%);font-size:16px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;cursor:pointer;display:none;z-index:12}
+    #save-btn{position:fixed;bottom:20px;left:calc(50% + 120px);font-size:16px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
+
+    /* ---------- RIGHT DOCK: COLLAPSIBLE MENU ---------- */
+    #dock{
+      position:relative;
+      width:min(360px, 92vw);
+      height:100vh;
+      background:linear-gradient(180deg, rgba(15,15,15,.92), rgba(10,10,10,.92));
+      border-left:1px solid rgba(255,255,255,.15);
+      padding:10px 10px 14px 10px;
+      box-sizing:border-box;
+      overflow:auto;
+    }
+    #dock header{display:flex;align-items:center;gap:8px;justify-content:space-between;position:sticky;top:0;background:inherit;padding:6px 0 8px 0;z-index:2}
+    #dock h2{margin:0;font-size:14px;opacity:.9}
+    #menu-btn{display:none} /* legacy button hidden (dock is always visible when opened) */
+    .btn{padding:6px 10px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;font-size:13px}
+
+    /* Native accordion look tweaks */
+    details{
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:8px;
+      margin:8px 0;
+      background:rgba(255,255,255,.04);
+      overflow:hidden;
+    }
+    summary{
+      list-style:none;
+      cursor:pointer;
+      padding:10px 12px;
+      font-weight:600;
+      display:flex;align-items:center;gap:8px;
+      position:relative;
+    }
+    summary::-webkit-details-marker{display:none}
+    summary::after{
+      content:'▸';
+      position:absolute; right:12px;
+      transition:transform .2s ease;
+      opacity:.8;
+    }
+    details[open] summary::after{ transform:rotate(90deg); }
+    .section-body{padding:8px 12px 12px 12px;display:flex;flex-direction:column;gap:10px}
+    input[type=range],select{width:100%}
+    label{font-size:14px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .small{font-size:12px;opacity:.85}
+    .chip{width:26px;height:26px;border-radius:50%;border:2px solid #fff;cursor:pointer;box-shadow:0 0 0 2px rgba(255,255,255,.15) inset}
+    .chip.sel{box-shadow:0 0 0 3px #fff inset}
+
+    /* Camera selector + radial trigger */
+    #cameraSelect{position:fixed;top:12px;left:12px;z-index:15;background:rgba(0,0,0,.7);color:#fff;border:1px solid #fff;border-radius:6px;padding:4px;font-size:14px}
     #cameraRadialTrigger{position:fixed;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:24px;text-align:center;line-height:44px;cursor:pointer;z-index:20;backdrop-filter:blur(6px);user-select:none;-webkit-user-select:none}
     #cameraRadialMenu{position:fixed;left:44px;top:50%;width:200px;height:200px;margin-left:-20px;margin-top:-100px;pointer-events:none;z-index:21}
     .camera-option{position:absolute;background:rgba(255,255,255,.15);border:1px solid #fff;color:#fff;padding:6px 12px;border-radius:6px;font-size:14px;cursor:pointer;white-space:nowrap;pointer-events:auto;transform:translate(-50%,-50%);transition:background .2s}
 
-    /* ---------- OTHER CONTROLS ---------- */
-    #controls{position:absolute;bottom:20px;left:50%;transform:translateX(-50%) translateY(100%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;transition:.3s ease;opacity:0;pointer-events:none;display:flex;flex-direction:column;gap:10px;width:calc(100% - 32px);max-width:480px;z-index:20}
-    #controls.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
-    #photo{user-select:auto;-webkit-user-select:auto;pointer-events:auto}
-    input[type=range],select{width:100%}
-    label{font-size:14px}
-    #cameraSelect{position:fixed;top:12px;left:12px;z-index:15;background:rgba(0,0,0,.7);color:#fff;border:1px solid #fff;border-radius:6px;padding:4px;font-size:16px}
-    *{user-select:none;-webkit-user-select:none}
-
-    /* ---------- TEXT OVERLAY ---------- */
-    #text-btn{position:fixed;bottom:20px;left:calc(50% - 120px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
-    #text-input-modal{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;display:flex;gap:10px;width:calc(100% - 32px);max-width:480px;z-index:25}
+    /* Other UI */
+    #text-btn{position:fixed;bottom:20px;left:calc(50% - 140px);font-size:14px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
+    #text-input-modal{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;display:none;gap:10px;width:min(480px, calc(100vw - 32px));z-index:25}
     #text-input{flex:1;padding:6px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:16px;user-select:auto;-webkit-user-select:auto}
     #text-submit,#text-cancel{padding:6px 12px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
 
-    /* ---------- COLOR MIX UI ---------- */
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .chip{width:26px;height:26px;border-radius:50%;border:2px solid #fff;cursor:pointer;box-shadow:0 0 0 2px rgba(255,255,255,.15) inset}
-    .chip.sel{box-shadow:0 0 0 3px #fff inset}
-    .small{font-size:12px;opacity:.9}
-    .divider{height:1px;background:rgba(255,255,255,.2);margin:4px 0}
-
-    /* ---------- PROCESSING OVERLAY ---------- */
     #processing{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:30;font-size:16px}
-    #hint{font-size:12px;opacity:.8}
+    #hint{font-size:12px;opacity:.8;padding:6px 0}
+
+    *{user-select:none;-webkit-user-select:none}
   </style>
 </head>
 <body>
+<div id="stage">
+  <div id="view">
+    <select id="cameraSelect"></select>
+    <video id="video" autoplay playsinline></video>
+    <img id="photo" style="display:none">
+    <canvas id="canvas" style="display:none"></canvas>
+    <div id="processing">Processing…</div>
 
-<select id="cameraSelect"></select>
-<video id="video" autoplay playsinline></video>
-<!-- We will use canvas as the preview; <img id="photo"> kept for compatibility but hidden -->
-<img id="photo" style="display:none">
-<canvas id="canvas" style="display:none"></canvas>
-<div id="processing">Processing…</div>
+    <div id="next-btn">↩ Next</div>
+    <button id="save-btn" style="display:none">Save</button>
+    <button id="shutter" title="Shutter"></button>
 
-<div id="menu-btn">☰</div>
-<div id="next-btn">↩ Next</div>
-<button id="save-btn" style="display:none">Save</button>
-<button id="shutter"></button>
+    <!-- radial selector elements -->
+    <div id="cameraRadialTrigger">🎥</div>
+    <div id="cameraRadialMenu"></div>
 
-<!-- radial selector elements -->
-<div id="cameraRadialTrigger"></div>
-<div id="cameraRadialMenu"></div>
-
-<div id="controls">
-  <label>Film Simulation
-    <select id="film">
-      <option value="kodachrome">Kodachrome</option>
-      <option value="acros">Acros (Monochrome)</option>
-    </select>
-  </label>
-  <label>JPEG Compression (<span id="jpeg-quality-val">60</span>%)
-    <input type="range" id="jpeg-quality" min="20" max="100" value="60">
-  </label>
-  <label>Film Grain (<span id="grain-val">19</span>)
-    <input type="range" id="grain" min="0" max="50" value="19">
-  </label>
-
-  <!-- —— COLOR MIX (H/S/L) —— -->
-  <div class="divider"></div>
-  <div class="row">
-    <input type="checkbox" id="cm-enable">
-    <label for="cm-enable" style="margin:0">Enable Per-Color Adjustments</label>
-  </div>
-  <div id="cm-wrap" style="display:none">
-    <div class="row" id="cm-palette" aria-label="Color buckets"></div>
-    <div class="row small"><span id="cm-label">Red</span> &nbsp;|&nbsp; Hue <span id="cm-hv">0</span>° &nbsp; Sat <span id="cm-sv">0</span> &nbsp; Lum <span id="cm-lv">0</span></div>
-    <label>Hue Shift (°)
-      <input type="range" id="cm-h" min="-30" max="30" value="0">
-    </label>
-    <label>Saturation (-100…+100)
-      <input type="range" id="cm-s" min="-100" max="100" value="0">
-    </label>
-    <label>Luminance (-100…+100)
-      <input type="range" id="cm-l" min="-100" max="100" value="0">
-    </label>
-    <div class="row">
-      <button id="cm-reset" style="padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer">Reset Color Mix</button>
-    </div>
-  </div>
-  <!-- —— /COLOR MIX —— -->
-
-  <!-- —— NEW: CALIBRATION ENTRY —— -->
-  <div class="divider"></div>
-  <button id="calibrate-btn" title="Capture a calibration shot, then fine-tune">Color Calibration</button>
-  <div id="hint" style="display:none;">Calibration armed: snap a photo to open calibration sliders.</div>
-
-  <!-- —— NEW: CALIBRATION PANEL —— -->
-  <div id="calibration-panel" style="display:none">
-    <div class="divider"></div>
-    <strong>Calibration</strong>
-    <label>White Balance – Red (-8…+8): <span id="wb-r-val">0</span>
-      <input type="range" id="wb-r" min="-8" max="8" value="0">
-    </label>
-    <label>White Balance – Blue (-8…+8): <span id="wb-b-val">0</span>
-      <input type="range" id="wb-b" min="-8" max="8" value="0">
-    </label>
-    <label>Vignette (0…100): <span id="vig-val">0</span>
-      <input type="range" id="vignette" min="0" max="100" value="0">
-    </label>
-    <div class="row">
-      <button id="save-profile-btn" title="Save current mix + WB + grain + vignette as a profile">Save as Film Profile</button>
+    <button id="text-btn" style="display:none">TEXT</button>
+    <div id="text-input-modal">
+      <input type="text" id="text-input" maxlength="50" placeholder="Enter text">
+      <button id="text-submit" class="btn">OK</button>
+      <button id="text-cancel" class="btn">Cancel</button>
     </div>
   </div>
 
-  <button id="menu-exit-btn">Exit Menu</button>
-  <button id="gallery-btn">View Gallery</button>
-</div>
+  <!-- Right dock, collapsible sections -->
+  <aside id="dock">
+    <header>
+      <h2>Menu</h2>
+      <div class="row">
+        <button id="collapse-all" class="btn">Collapse All</button>
+        <button id="expand-all" class="btn">Expand All</button>
+      </div>
+    </header>
 
-<button id="text-btn" style="display:none">TEXT</button>
-<div id="text-input-modal" style="display:none">
-  <input type="text" id="text-input" maxlength="50" placeholder="Enter text">
-  <button id="text-submit">OK</button>
-  <button id="text-cancel">Cancel</button>
+    <!-- Quick action -->
+    <div class="row" style="margin:6px 0 8px 0;">
+      <button id="calibrate-btn" class="btn" title="Capture a calibration shot, then fine-tune">Color Calibration</button>
+    </div>
+    <div id="hint" style="display:none;">Calibration armed: snap a photo to open calibration sliders.</div>
+
+    <!-- FILM -->
+    <details id="sec-film">
+      <summary>Film Simulation</summary>
+      <div class="section-body">
+        <label>Film
+          <select id="film">
+            <option value="kodachrome">Kodachrome</option>
+            <option value="acros">Acros (Monochrome)</option>
+          </select>
+        </label>
+      </div>
+    </details>
+
+    <!-- OUTPUT -->
+    <details id="sec-output">
+      <summary>Output (JPEG / Grain)</summary>
+      <div class="section-body">
+        <label>JPEG Compression (<span id="jpeg-quality-val">60</span>%)
+          <input type="range" id="jpeg-quality" min="20" max="100" value="60">
+        </label>
+        <label>Film Grain (<span id="grain-val">19</span>)
+          <input type="range" id="grain" min="0" max="50" value="19">
+        </label>
+      </div>
+    </details>
+
+    <!-- COLOR MIX -->
+    <details id="sec-colormix">
+      <summary>Per-Color Adjustments</summary>
+      <div class="section-body">
+        <div class="row">
+          <input type="checkbox" id="cm-enable">
+          <label for="cm-enable" style="margin:0">Enable Color Mix</label>
+        </div>
+        <div id="cm-wrap" style="display:none">
+          <div class="row" id="cm-palette" aria-label="Color buckets"></div>
+          <div class="row small"><span id="cm-label">Red</span> &nbsp;|&nbsp; Hue <span id="cm-hv">0</span>° &nbsp; Sat <span id="cm-sv">0</span> &nbsp; Lum <span id="cm-lv">0</span></div>
+          <label>Hue Shift (°)
+            <input type="range" id="cm-h" min="-30" max="30" value="0">
+          </label>
+          <label>Saturation (-100…+100)
+            <input type="range" id="cm-s" min="-100" max="100" value="0">
+          </label>
+          <label>Luminance (-100…+100)
+            <input type="range" id="cm-l" min="-100" max="100" value="0">
+          </label>
+          <div class="row">
+            <button id="cm-reset" class="btn">Reset Color Mix</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- CALIBRATION -->
+    <details id="sec-calibration">
+      <summary>Calibration (White Balance / Vignette)</summary>
+      <div class="section-body">
+        <label>WB – Red (-8…+8): <span id="wb-r-val">0</span>
+          <input type="range" id="wb-r" min="-8" max="8" value="0">
+        </label>
+        <label>WB – Blue (-8…+8): <span id="wb-b-val">0</span>
+          <input type="range" id="wb-b" min="-8" max="8" value="0">
+        </label>
+        <label>Vignette (0…100): <span id="vig-val">0</span>
+          <input type="range" id="vignette" min="0" max="100" value="0">
+        </label>
+      </div>
+    </details>
+
+    <!-- HALATION -->
+    <details id="sec-halation">
+      <summary>Halation</summary>
+      <div class="section-body">
+        <div class="row">
+          <input type="checkbox" id="hal-enable">
+          <label for="hal-enable" style="margin:0">Enable Halation</label>
+        </div>
+        <label>Amount (0…100): <span id="hal-amt-val">25</span>
+          <input type="range" id="hal-amt" min="0" max="100" value="25">
+        </label>
+        <label>Threshold (0…100): <span id="hal-thr-val">80</span>
+          <input type="range" id="hal-thr" min="0" max="100" value="80">
+        </label>
+        <label>Spread (px 1…40): <span id="hal-spread-val">12</span>
+          <input type="range" id="hal-spread" min="1" max="40" value="12">
+        </label>
+        <label>Tone (Hue 0…360°): <span id="hal-tone-val">15</span>
+          <input type="range" id="hal-tone" min="0" max="360" value="15">
+        </label>
+      </div>
+    </details>
+
+    <!-- UTILITIES -->
+    <details id="sec-utils">
+      <summary>Utilities</summary>
+      <div class="section-body">
+        <div class="row">
+          <button id="save-profile-btn" class="btn" title="Save current look as a profile">Save as Film Profile</button>
+          <button id="gallery-btn" class="btn">View Gallery</button>
+          <button id="menu-exit-btn" class="btn">Hide Dock</button>
+        </div>
+      </div>
+    </details>
+  </aside>
 </div>
 
 <script>
 /* ---------- DOM refs & state ---------- */
 const video        = document.getElementById('video');
 const canvas       = document.getElementById('canvas');
-const photo        = document.getElementById('photo');   // kept for compatibility; preview uses canvas
+const photo        = document.getElementById('photo');
 const processingEl = document.getElementById('processing');
 const shutter      = document.getElementById('shutter');
 const saveBtn      = document.getElementById('save-btn');
 const nextBtn      = document.getElementById('next-btn');
-const menuBtn      = document.getElementById('menu-btn');
-const controls     = document.getElementById('controls');
 const grainSlider  = document.getElementById('grain');
 const grainVal     = document.getElementById('grain-val');
 const filmSelect   = document.getElementById('film');
@@ -165,22 +258,42 @@ const textInput    = document.getElementById('text-input');
 const textSubmit   = document.getElementById('text-submit');
 const textCancel   = document.getElementById('text-cancel');
 
+const dock         = document.getElementById('dock');
+const collapseAll  = document.getElementById('collapse-all');
+const expandAll    = document.getElementById('expand-all');
+const secFilm      = document.getElementById('sec-film');
+const secOutput    = document.getElementById('sec-output');
+const secColorMix  = document.getElementById('sec-colormix');
+const secCalibration = document.getElementById('sec-calibration');
+const secHalation  = document.getElementById('sec-halation');
+const secUtils     = document.getElementById('sec-utils');
+
 const calibrateBtn = document.getElementById('calibrate-btn');
-const calibrationPanel = document.getElementById('calibration-panel');
-const hintEl = document.getElementById('hint');
-const wbRSlider = document.getElementById('wb-r');
-const wbBSlider = document.getElementById('wb-b');
-const wbRVal = document.getElementById('wb-r-val');
-const wbBVal = document.getElementById('wb-b-val');
+const hintEl       = document.getElementById('hint');
+const wbRSlider    = document.getElementById('wb-r');
+const wbBSlider    = document.getElementById('wb-b');
+const wbRVal       = document.getElementById('wb-r-val');
+const wbBVal       = document.getElementById('wb-b-val');
 const vignetteSlider = document.getElementById('vignette');
-const vigVal = document.getElementById('vig-val');
+const vigVal       = document.getElementById('vig-val');
 const saveProfileBtn = document.getElementById('save-profile-btn');
 
-/* ----- radial selector refs ----- */
+/* Halation refs */
+const halEnable = document.getElementById('hal-enable');
+const halAmt    = document.getElementById('hal-amt');
+const halThr    = document.getElementById('hal-thr');
+const halSpread = document.getElementById('hal-spread');
+const halTone   = document.getElementById('hal-tone');
+const halAmtVal = document.getElementById('hal-amt-val');
+const halThrVal = document.getElementById('hal-thr-val');
+const halSpreadVal = document.getElementById('hal-spread-val');
+const halToneVal = document.getElementById('hal-tone-val');
+
+/* Radial refs */
 const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
 const cameraRadialMenu    = document.getElementById('cameraRadialMenu');
 
-/* ----- Color Mix refs ----- */
+/* Color Mix refs */
 const cmEnable = document.getElementById('cm-enable');
 const cmWrap   = document.getElementById('cm-wrap');
 const cmPalette= document.getElementById('cm-palette');
@@ -196,9 +309,11 @@ const cmReset  = document.getElementById('cm-reset');
 /* ---------- helpers ---------- */
 function lockScroll(){
   document.documentElement.style.overflow = 'hidden';
-  document.body.style.overflow           = 'hidden';
+  document.body.style.overflow = 'hidden';
   window.scrollTo(0,0);
 }
+function collapseAllSections(){ [secFilm,secOutput,secColorMix,secCalibration,secHalation,secUtils].forEach(d=>d.removeAttribute('open')); }
+function expandAllSections(){ [secFilm,secOutput,secColorMix,secCalibration,secHalation,secUtils].forEach(d=>d.setAttribute('open','')); }
 
 /* ---------- state ---------- */
 let stream   = null,
@@ -207,14 +322,13 @@ let stream   = null,
     jpegQ    = +jpegSlider.value,
     userText = '',
     dim      = null,
-    lastFrameImageData = null; // processed pixels
+    lastFrameImageData = null;
 
-/* ---------- Calibration state ---------- */
-let calibrationArmed = false; // true after tapping "Color Calibration"
-let activeProfileName = null; // when selecting a saved profile
+let calibrationArmed = false;
+let activeProfileName = null;
 
 const PROFILE_KEY = 'filmProfilesV1';
-let profiles = {}; // name -> settings
+let profiles = {};
 
 /* ---------- COLOR MIX state ---------- */
 const CM_KEY = 'colorMixSettingsV1';
@@ -239,35 +353,34 @@ try{
   }
 }catch{}
 
-/* ---------- NEW: WB/Vignette state ---------- */
+/* ---------- WB/Vignette state ---------- */
 const WB_KEY = 'wbSettingsV1';
-let wb = { r:0, b:0 }; // -8..+8 each
-let vignetteAmt = 0;   // 0..100
+let wb = { r:0, b:0 };
+let vignetteAmt = 0;
+try{ const savedWB = JSON.parse(localStorage.getItem(WB_KEY)); if (savedWB) wb = savedWB; }catch{}
+try{ const savedVig = +localStorage.getItem('vignetteAmtV1'); if (!isNaN(savedVig)) vignetteAmt = savedVig; }catch{}
+
+/* ---------- Halation state ---------- */
+const HAL_KEY = 'halationSettingsV1';
+let hal = { enable:false, amount:25, threshold:80, spread:12, tone:15 };
 try{
-  const savedWB = JSON.parse(localStorage.getItem(WB_KEY));
-  if (savedWB && typeof savedWB.r === 'number' && typeof savedWB.b === 'number') wb = savedWB;
-}catch{}
-try{
-  const savedVig = +localStorage.getItem('vignetteAmtV1');
-  if (!isNaN(savedVig)) vignetteAmt = savedVig;
+  const savedH = JSON.parse(localStorage.getItem(HAL_KEY));
+  if (savedH && typeof savedH === 'object') hal = Object.assign(hal, savedH);
 }catch{}
 
-/* ---------- sliders & simple UI ---------- */
-grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; };
+/* ---------- UI wiring ---------- */
+collapseAll.onclick = collapseAllSections;
+expandAll.onclick   = expandAllSections;
+
+grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; if (lastFrameImageData) shootReprocess(); };
 filmSelect.onchange = () => {
   const v = filmSelect.value;
-  if (v.startsWith('profile:')){
-    activeProfileName = v.slice(8);
-    applyProfileToUI(activeProfileName);
-  }else{
-    activeProfileName = null;
-    film = v;
-  }
+  if (v.startsWith('profile:')){ activeProfileName = v.slice(8); applyProfileToUI(activeProfileName); }
+  else { activeProfileName = null; film = v; if (lastFrameImageData) shootReprocess(); }
 };
 jpegSlider.oninput  = () => { jpegQ  = +jpegSlider.value; jpegVal.textContent = jpegQ; };
-menuBtn.onclick     = () => controls.classList.toggle('show');
 
-/* ---------- Color Mix UI build ---------- */
+/* Color Mix */
 function buildPalette(){
   cmPalette.innerHTML = '';
   colors.forEach((c, i) => {
@@ -275,7 +388,7 @@ function buildPalette(){
     chip.className = 'chip' + (i===cmIdx ? ' sel':'');
     chip.style.background = c.css;
     chip.title = c.name;
-    chip.addEventListener('click', () => { cmIdx = i; refreshCmControls(); buildPalette(); });
+    chip.addEventListener('click', () => { cmIdx = i; refreshCmControls(); buildPalette(); if (lastFrameImageData) shootReprocess(); });
     cmPalette.appendChild(chip);
   });
 }
@@ -291,42 +404,56 @@ function refreshCmControls(){
   cmLV.textContent = cmL.value;
 }
 function saveCmState(){ localStorage.setItem(CM_KEY, JSON.stringify(cmState)); }
-cmEnable.addEventListener('change', () => { cmState.enable = cmEnable.checked; saveCmState(); refreshCmControls(); });
-cmH.addEventListener('input', () => { cmState.dH[cmIdx] = (+cmH.value)/360; cmHV.textContent = cmH.value; saveCmState(); });
-cmS.addEventListener('input', () => { cmState.dS[cmIdx] = (+cmS.value)/200; cmSV.textContent = cmS.value; saveCmState(); });
-cmL.addEventListener('input', () => { cmState.dL[cmIdx] = (+cmL.value)/200; cmLV.textContent = cmL.value; saveCmState(); });
-cmReset.addEventListener('click', () => { cmState.dH.fill(0); cmState.dS.fill(0); cmState.dL.fill(0); saveCmState(); refreshCmControls(); });
+cmEnable.addEventListener('change', () => { cmState.enable = cmEnable.checked; saveCmState(); refreshCmControls(); if (lastFrameImageData) shootReprocess(); });
+cmH.addEventListener('input', () => { cmState.dH[cmIdx] = (+cmH.value)/360; cmHV.textContent = cmH.value; saveCmState(); if (lastFrameImageData) shootReprocess(); });
+cmS.addEventListener('input', () => { cmState.dS[cmIdx] = (+cmS.value)/200; cmSV.textContent = cmS.value; saveCmState(); if (lastFrameImageData) shootReprocess(); });
+cmL.addEventListener('input', () => { cmState.dL[cmIdx] = (+cmL.value)/200; cmLV.textContent = cmL.value; saveCmState(); if (lastFrameImageData) shootReprocess(); });
+cmReset.addEventListener('click', () => { cmState.dH.fill(0); cmState.dS.fill(0); cmState.dL.fill(0); saveCmState(); refreshCmControls(); if (lastFrameImageData) shootReprocess(); });
 buildPalette(); refreshCmControls();
 
-/* ---------- NEW: Calibration UI wiring ---------- */
-function refreshWBUI(){
-  wbRSlider.value = wb.r; wbBSlider.value = wb.b;
-  wbRVal.textContent = wb.r; wbBVal.textContent = wb.b;
-}
-function refreshVignetteUI(){
-  vignetteSlider.value = vignetteAmt;
-  vigVal.textContent = vignetteAmt;
+/* Calibration wiring */
+function refreshWBUI(){ wbRSlider.value = wb.r; wbBSlider.value = wb.b; wbRVal.textContent = wb.r; wbBVal.textContent = wb.b; }
+function refreshVignetteUI(){ vignetteSlider.value = vignetteAmt; vigVal.textContent = vignetteAmt; }
+function refreshHalUI(){
+  halEnable.checked = !!hal.enable;
+  halAmt.value = hal.amount; halAmtVal.textContent = hal.amount;
+  halThr.value = hal.threshold; halThrVal.textContent = hal.threshold;
+  halSpread.value = hal.spread; halSpreadVal.textContent = hal.spread;
+  halTone.value = hal.tone; halToneVal.textContent = hal.tone;
 }
 function saveWB(){ localStorage.setItem(WB_KEY, JSON.stringify(wb)); }
 function saveVignette(){ localStorage.setItem('vignetteAmtV1', String(vignetteAmt)); }
+function saveHal(){ localStorage.setItem(HAL_KEY, JSON.stringify(hal)); }
 
 wbRSlider.oninput = () => { wb.r = +wbRSlider.value; wbRVal.textContent = wb.r; saveWB(); if (lastFrameImageData) shootReprocess(); };
 wbBSlider.oninput = () => { wb.b = +wbBSlider.value; wbBVal.textContent = wb.b; saveWB(); if (lastFrameImageData) shootReprocess(); };
 vignetteSlider.oninput = () => { vignetteAmt = +vignetteSlider.value; vigVal.textContent = vignetteAmt; saveVignette(); if (lastFrameImageData) shootReprocess(); };
 
+halEnable.onchange = () => { hal.enable = halEnable.checked; saveHal(); if (lastFrameImageData) shootReprocess(); };
+halAmt.oninput = () => { hal.amount = +halAmt.value; halAmtVal.textContent = hal.amount; saveHal(); if (lastFrameImageData) shootReprocess(); };
+halThr.oninput = () => { hal.threshold = +halThr.value; halThrVal.textContent = hal.threshold; saveHal(); if (lastFrameImageData) shootReprocess(); };
+halSpread.oninput = () => { hal.spread = +halSpread.value; halSpreadVal.textContent = hal.spread; saveHal(); if (lastFrameImageData) shootReprocess(); };
+halTone.oninput = () => { hal.tone = +halTone.value; halToneVal.textContent = hal.tone; saveHal(); if (lastFrameImageData) shootReprocess(); };
+
+/* Color Calibration flow */
 calibrateBtn.onclick = () => {
   calibrationArmed = true;
   hintEl.style.display = 'block';
-  controls.classList.remove('show');
-  // ensure color mix visible during calibration
-  cmState.enable = true; saveCmState(); refreshCmControls();
+  // Ensure important sections are visible but collapsed until shot
+  collapseAllSections();
 };
 
-function openCalibrationPanel(){
-  controls.classList.add('show');
-  calibrationPanel.style.display = 'block';
-  refreshWBUI(); refreshVignetteUI();
+function openCalibrationAccordion(){
+  // After a calibration shot, open just the relevant sections
+  collapseAllSections();
+  secCalibration.setAttribute('open','');
+  secHalation.setAttribute('open','');
 }
+
+/* Profiles */
+const PROFILE_KEY = 'filmProfilesV1';
+let profiles = {};
+const saveProfileBtn = document.getElementById('save-profile-btn');
 
 saveProfileBtn.onclick = () => {
   const name = (prompt('Profile name?') || '').trim();
@@ -336,26 +463,20 @@ saveProfileBtn.onclick = () => {
     cmState,
     grainAmt,
     wb,
-    vignetteAmt
+    vignetteAmt,
+    hal
   };
   profiles[name] = settings;
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
   populateProfiles();
-  // auto-select it
   filmSelect.value = 'profile:' + name;
   activeProfileName = name;
   alert('Saved profile: ' + name);
 };
 
-/* ---------- Profiles load/apply ---------- */
 function populateProfiles(){
-  // ensure an optgroup exists
   let group = filmSelect.querySelector('optgroup[label="Custom Profiles"]');
-  if (!group){
-    group = document.createElement('optgroup');
-    group.label = 'Custom Profiles';
-    filmSelect.appendChild(group);
-  }
+  if (!group){ group = document.createElement('optgroup'); group.label = 'Custom Profiles'; filmSelect.appendChild(group); }
   group.innerHTML = '';
   Object.keys(profiles).forEach(name => {
     const opt = document.createElement('option');
@@ -364,47 +485,44 @@ function populateProfiles(){
     group.appendChild(opt);
   });
 }
-
 function loadProfiles(){
-  try{
-    const raw = JSON.parse(localStorage.getItem(PROFILE_KEY));
-    if (raw && typeof raw === 'object') profiles = raw;
-  }catch{}
+  try{ const raw = JSON.parse(localStorage.getItem(PROFILE_KEY)); if (raw && typeof raw==='object') profiles = raw; }catch{}
   populateProfiles();
 }
-
 function applyProfileToUI(name){
-  const p = profiles[name];
-  if (!p) return;
-  // Set base film but keep select on profile
+  const p = profiles[name]; if (!p) return;
   film = p.filmBase || 'kodachrome';
   grainAmt = typeof p.grainAmt === 'number' ? p.grainAmt : grainAmt;
   grainSlider.value = grainAmt; grainVal.textContent = grainAmt;
 
-  if (p.cmState){
-    cmState = JSON.parse(JSON.stringify(p.cmState));
-    saveCmState();
-    refreshCmControls();
-    buildPalette();
-  }
-  if (p.wb){
-    wb = { r: p.wb.r|0, b: p.wb.b|0 };
-    saveWB(); refreshWBUI();
-  }
-  if (typeof p.vignetteAmt === 'number'){
-    vignetteAmt = p.vignetteAmt|0;
-    saveVignette(); refreshVignetteUI();
-  }
-  // reprocess if a frame exists
+  if (p.cmState){ cmState = JSON.parse(JSON.stringify(p.cmState)); localStorage.setItem(CM_KEY, JSON.stringify(cmState)); refreshCmControls(); buildPalette(); }
+  if (p.wb){ wb = { r: p.wb.r|0, b: p.wb.b|0 }; localStorage.setItem(WB_KEY, JSON.stringify(wb)); refreshWBUI(); }
+  if (typeof p.vignetteAmt === 'number'){ vignetteAmt = p.vignetteAmt|0; localStorage.setItem('vignetteAmtV1', String(vignetteAmt)); refreshVignetteUI(); }
+  if (p.hal){ hal = Object.assign({ enable:false, amount:25, threshold:80, spread:12, tone:15 }, p.hal); localStorage.setItem(HAL_KEY, JSON.stringify(hal)); refreshHalUI(); }
+
   if (lastFrameImageData) shootReprocess();
 }
 
 /* ---------- NEXT / MENU ---------- */
+document.getElementById('menu-exit-btn').onclick = () => dock.style.display = 'none';
+document.getElementById('gallery-btn').onclick = () => {
+  const gal  = document.getElementById('gallery-content');
+  gal.innerHTML = '';
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('saved-photo-')).sort().reverse();
+  if (!keys.length){
+    gal.innerHTML = '<p style="color:#fff">No saved images.</p>';
+  }else{
+    keys.forEach(k => {
+      const i = document.createElement('img');
+      i.src   = localStorage.getItem(k);
+      i.style.width = '100px';
+      gal.appendChild(i);
+    });
+  }
+  document.getElementById('gallery-overlay').style.display = 'block';
+};
+
 nextBtn.onclick = () => {
-  document.documentElement.style.overflow = 'hidden';
-  document.body.style.position  = 'fixed';
-  document.body.style.width     = '100%';
-  window.scrollTo(0, 0);
   lockScroll();
   video.style.display   = 'block';
   canvas.style.display  = 'none';
@@ -416,14 +534,13 @@ nextBtn.onclick = () => {
   dim = null;
   userText = '';
   hintEl.style.display = 'none';
-  calibrationPanel.style.display = 'none';
   calibrationArmed = false;
+  collapseAllSections();
 };
 
 /* ---------- camera core ---------- */
 cameraSelect.onchange = () => bootCam(cameraSelect.value);
 
-// OPTIMIZATION: request ~1080p instead of 4K to reduce pixel work
 async function bootCam(id = null){
   if (stream) stream.getTracks().forEach(t => t.stop());
   const c = { video: id
@@ -438,7 +555,6 @@ async function bootCam(id = null){
     alert('Camera error: ' + e.message);
   }
 }
-
 async function cams(){
   const v = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
   const current = cameraSelect.value;
@@ -460,7 +576,6 @@ let currentHoveredOpt = null;
 cameraRadialTrigger.addEventListener('pointerdown', () => {
   radialTimeout = setTimeout(() => { showCameraRadialMenu(); radialActive = true; }, 300);
 });
-
 document.addEventListener('pointermove', e => {
   if (!radialActive) return;
   const opts = document.querySelectorAll('.camera-option');
@@ -476,7 +591,6 @@ document.addEventListener('pointermove', e => {
   currentHoveredOpt = closest;
   if (closest) closest.style.background = 'rgba(255,255,255,0.4)';
 });
-
 document.addEventListener('pointerup', () => {
   clearTimeout(radialTimeout);
   if (radialActive){
@@ -490,7 +604,6 @@ document.addEventListener('pointerup', () => {
     currentHoveredOpt = null;
   }
 });
-
 function showCameraRadialMenu(){
   cameraRadialMenu.innerHTML = '';
   const opts    = Array.from(cameraSelect.options);
@@ -530,7 +643,7 @@ textInput.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDe
 /* ---------- Worker (inline via Blob) ---------- */
 const workerSrc = `
 self.onmessage = (e) => {
-  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt } = e.data;
+  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt, hal } = e.data;
   const d = imageData.data;
   const useColorMix = cmState.enable && film !== 'acros';
 
@@ -572,78 +685,119 @@ self.onmessage = (e) => {
     return wHue * gate;
   }
 
-  // Simple LFSR noise for speed (fewer Math.random calls)
+  // LFSR noise
   let seed = 1234567;
-  function fastNoise(){
-    seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
-    // map to [-1,1]
-    return ((seed>>>0) / 0x7fffffff) * 2 - 1;
-  }
+  function fastNoise(){ seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return ((seed>>>0) / 0x7fffffff) * 2 - 1; }
 
-  // White balance gains from UI steps (-8..+8). Each step ~6% gain.
+  // White balance gains
   const gainR = 1 + (wb.r || 0) * 0.06;
   const gainB = 1 + (wb.b || 0) * 0.06;
 
-  // Vignette setup
   const W = imageData.width, H = imageData.height;
   const cx = W * 0.5, cy = H * 0.5;
   const maxR = Math.min(W, H) * 0.5;
-  const vigPower = (vignetteAmt||0) / 100; // 0..1
+  const vigPower = (vignetteAmt||0) / 100;
 
+  const base = new Uint8ClampedArray(d);
+
+  // Film look + color mix + WB + grain + vignette
   for (let y=0; y<H; y++){
     for (let x=0; x<W; x++){
       const i = (y*W + x) * 4;
-      let r = d[i], g = d[i+1], bl = d[i+2];
+      let r = base[i], g = base[i+1], bl = base[i+2];
 
-      if (film === 'acros'){
-        const a = (r+g+bl)/3; r=g=bl=a;
-      }else{
-        const a = (r+g+bl)/3;
-        r = r*.85 + a*.15; g = g*.85 + a*.15; bl = bl*.85 + a*.15;
-      }
+      if (film === 'acros'){ const a = (r+g+bl)/3; r=g=bl=a; }
+      else { const a = (r+g+bl)/3; r = r*.85 + a*.15; g = g*.85 + a*.15; bl = bl*.85 + a*.15; }
 
       if (useColorMix){
         let [h, s, v] = rgbToHsv(r,g,bl);
         let dH=0, dS=0, dL=0, sumW=0;
         for (let k=0; k<8; k++){
           const w = bucketWeight(h, s, colors[k].center, hueWidth[k]);
-          if (w>0){
-            sumW += w;
-            dH += w * (cmState.dH[k] || 0);
-            dS += w * (cmState.dS[k] || 0);
-            dL += w * (cmState.dL[k] || 0);
-          }
+          if (w>0){ sumW += w; dH += w*(cmState.dH[k]||0); dS += w*(cmState.dS[k]||0); dL += w*(cmState.dL[k]||0); }
         }
-        if (sumW>0){
-          h = h + dH;
-          s = Math.max(0, Math.min(1, s + dS));
-          v = Math.max(0, Math.min(1, v + dL));
-          [r,g,bl] = hsvToRgb(h,s,v);
-        }
+        if (sumW>0){ h=h+dH; s=Math.max(0,Math.min(1,s+dS)); v=Math.max(0,Math.min(1,v+dL)); [r,g,bl]=hsvToRgb(h,s,v); }
       }
 
-      // White balance (channel gains)
-      r = r * gainR;
-      bl = bl * gainB;
+      // WB
+      r *= gainR; bl *= gainB;
 
       // Grain
-      if (grainAmt){
-        const n = fastNoise() * grainAmt;
-        r += n; g += n; bl += n;
-      }
+      const n = fastNoise() * (grainAmt||0);
+      r += n; g += n; bl += n;
 
-      // Vignette (quadratic falloff)
+      // Vignette
       if (vigPower > 0){
         const dx = x - cx, dy = y - cy;
-        const rr = Math.sqrt(dx*dx + dy*dy) / maxR; // 0..~1.4
-        const fall = Math.min(1, Math.max(0, rr));
-        const vFactor = 1 - vigPower * (fall*fall);
+        const rr = Math.min(1, Math.hypot(dx,dy) / maxR);
+        const vFactor = 1 - vigPower * (rr*rr);
         r *= vFactor; g *= vFactor; bl *= vFactor;
       }
 
-      d[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
-      d[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
-      d[i+2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
+      d[i]   = r<0?0:r>255?255:r;
+      d[i+1] = g<0?0:g>255?255:g;
+      d[i+2] = bl<0?0:bl>255?255:bl;
+    }
+  }
+
+  // Halation
+  if (hal && hal.enable && hal.amount>0){
+    const amount = hal.amount / 100;
+    const thr = Math.min(100, Math.max(0, hal.threshold)) / 100;
+    const spread = Math.max(1, Math.min(40, Math.floor(hal.spread)));
+    const toneHue = ((hal.tone % 360)+360)%360 / 360;
+
+    const mask = new Float32Array(W*H);
+    for (let y=0; y<H; y++){
+      for (let x=0; x<W; x++){
+        const i = (y*W + x) * 4;
+        const r = d[i], g = d[i+1], b = d[i+2];
+        const lum = (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+        let m = (lum - thr) / (1 - thr);
+        if (m < 0) m = 0;
+        mask[y*W + x] = m;
+      }
+    }
+
+    const passes = 3;
+    const tmp = new Float32Array(W*H);
+    function blurPass(src, dst, rad){
+      const w = W, h = H;
+      // horizontal
+      for (let y=0; y<h; y++){
+        let acc = 0, n = 0;
+        for (let x=-rad; x<=rad; x++){ const xx = Math.min(w-1, Math.max(0,x)); acc += src[y*w + xx]; n++; }
+        for (let x=0; x<w; x++){
+          dst[y*w + x] = acc / n;
+          const xOut = x - rad, xIn = x + rad + 1;
+          if (xOut >= 0){ acc -= src[y*w + xOut]; n--; }
+          if (xIn  <  w){ acc += src[y*w + xIn];  n++; }
+        }
+      }
+      // vertical
+      for (let x=0; x<w; x++){
+        let acc = 0, n = 0;
+        for (let y=-rad; y<=rad; y++){ const yy = Math.min(h-1, Math.max(0,y)); acc += dst[yy*w + x]; n++; }
+        for (let y=0; y<h; y++){
+          const idx = y*w + x;
+          src[idx] = acc / n;
+          const yOut = y - rad, yIn = y + rad + 1;
+          if (yOut >= 0){ acc -= dst[yOut*w + x]; n--; }
+          if (yIn  <  h){ acc += dst[yIn*w + x];  n++; }
+        }
+      }
+    }
+    for (let p=0; p<passes; p++) blurPass(mask, tmp, spread);
+
+    const toneRGB = (function(){ const [r,g,b]=hsvToRgb(toneHue, 0.85, 1.0); return [r,g,b]; })();
+
+    for (let i=0, px=0; i<d.length; i+=4, px++){
+      const m = mask[px] * amount;
+      if (m>1e-4){
+        d[i  ] = Math.min(255, d[i  ] + toneRGB[0]*m);
+        d[i+1] = Math.min(255, d[i+1] + toneRGB[1]*m);
+        d[i+2] = Math.min(255, d[i+2] + toneRGB[2]*m);
+      }
     }
   }
 
@@ -652,7 +806,7 @@ self.onmessage = (e) => {
 `;
 const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], {type:'application/javascript'})));
 
-/* ---------- shoot (instant preview + background processing) ---------- */
+/* ---------- shoot / reprocess ---------- */
 shutter.onclick = () => { userText=''; shoot(); };
 
 async function shoot(){
@@ -665,18 +819,15 @@ async function shoot(){
         bot = b*2,
         fh  = h + b + bot;
 
-  canvas.width  = fw;
-  canvas.height = fh;
+  canvas.width  = fw; canvas.height = fh;
   dim           = {fw, fh, b, bot};
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  // 1) Draw white mat + raw frame immediately (instant preview)
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0,0,fw,fh);
+  // quick preview
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,fw,fh);
   ctx.drawImage(video, b, b, w, h);
 
-  // 2) Swap UI to preview instantly (no toDataURL here)
   canvas.style.display = 'block';
   video.style.display  = 'none';
   photo.style.display  = 'none';
@@ -685,7 +836,6 @@ async function shoot(){
   saveBtn.style.display = 'block';
   lockScroll();
 
-  // 3) Kick off processing in a worker
   const roi = ctx.getImageData(b,b,w,h);
   processingEl.style.display = 'flex';
   const effective = getEffectiveSettings();
@@ -697,33 +847,32 @@ async function shoot(){
     colors,
     hueWidth,
     wb: effective.wb,
-    vignetteAmt: effective.vignetteAmt
+    vignetteAmt: effective.vignetteAmt,
+    hal: effective.hal
   }, [roi.data.buffer]);
 
   worker.onmessage = (e) => {
     const { imageData } = e.data;
-    // put processed pixels back
     ctx.putImageData(imageData, b, b);
-    lastFrameImageData = ctx.getImageData(0,0,fw,fh); // for text overlay update
+    lastFrameImageData = ctx.getImageData(0,0,fw,fh);
     drawTxt(ctx);
     processingEl.style.display = 'none';
 
-    // If calibration was armed, open the panel after this shot
     if (calibrationArmed){
-      controls.classList.add('show');
-      calibrationPanel.style.display = 'block';
       hintEl.style.display = 'none';
       calibrationArmed = false;
+      openCalibrationAccordion(); // <-- only open the two relevant sections
     }
   };
 }
 
-/* ---------- reprocess current frame with new settings (no new capture) ---------- */
 function shootReprocess(){
   if (!dim) return;
   const {fw, fh, b} = dim;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const roi = ctx.getImageData(b,b, canvas.width - b*2, canvas.height - b*2 - (dim.bot - b));
+  const roiW = canvas.width - b*2;
+  const roiH = canvas.height - b*2 - (dim.bot - b);
+  const roi = ctx.getImageData(b,b, roiW, roiH);
   processingEl.style.display = 'flex';
   const effective = getEffectiveSettings();
   worker.postMessage({
@@ -734,7 +883,8 @@ function shootReprocess(){
     colors,
     hueWidth,
     wb: effective.wb,
-    vignetteAmt: effective.vignetteAmt
+    vignetteAmt: effective.vignetteAmt,
+    hal: effective.hal
   }, [roi.data.buffer]);
   worker.onmessage = (e) => {
     const { imageData } = e.data;
@@ -745,7 +895,7 @@ function shootReprocess(){
   };
 }
 
-/* ---------- resolve settings (handles profiles) ---------- */
+/* ---------- resolve settings ---------- */
 function getEffectiveSettings(){
   if (activeProfileName && profiles[activeProfileName]){
     const p = profiles[activeProfileName];
@@ -754,19 +904,14 @@ function getEffectiveSettings(){
       grainAmt: p.grainAmt,
       cmState : p.cmState || cmState,
       wb      : p.wb || wb,
-      vignetteAmt: typeof p.vignetteAmt === 'number' ? p.vignetteAmt : 0
+      vignetteAmt: typeof p.vignetteAmt === 'number' ? p.vignetteAmt : 0,
+      hal     : p.hal || hal
     };
   }
-  return {
-    filmBase: film,
-    grainAmt,
-    cmState,
-    wb,
-    vignetteAmt
-  };
+  return { filmBase: film, grainAmt, cmState, wb, vignetteAmt, hal };
 }
 
-/* ---------- update text on processed frame ---------- */
+/* ---------- text overlay ---------- */
 function updateTxt(){
   if (!dim){ return; }
   const {fw, fh, b, bot} = dim;
@@ -774,8 +919,6 @@ function updateTxt(){
   if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
   drawTxt(ctx);
 }
-
-/* ---------- text rendering ---------- */
 function drawTxt(ctx){
   if (!userText || !dim) return;
   const {fw, fh, bot} = dim;
@@ -792,18 +935,13 @@ function drawTxt(ctx){
   lastFrameImageData = ctx.getImageData(0,0,fw,fh);
 }
 
-/* ---------- save (sRGB JPEG) ---------- */
+/* ---------- save ---------- */
 saveBtn.onclick = () => {
   if (!dim){ alert('Take a photo first'); return; }
-  const {fw, fh} = dim,
-        scale    = 1810/4420,
-        tmp      = document.createElement('canvas');
-
-  tmp.width  = Math.floor(fw*scale);
-  tmp.height = Math.floor(fh*scale);
+  const {fw, fh} = dim, scale = 1810/4420, tmp = document.createElement('canvas');
+  tmp.width  = Math.floor(fw*scale); tmp.height = Math.floor(fh*scale);
   const tctx = tmp.getContext('2d');
   tctx.drawImage(canvas,0,0,tmp.width,tmp.height);
-
   tmp.toBlob(blob => {
     if (!blob){ alert('Save failed'); return; }
     const a   = document.createElement('a');
@@ -811,7 +949,6 @@ saveBtn.onclick = () => {
     a.download= `photo-${Date.now()}.jpg`;
     a.click();
     URL.revokeObjectURL(a.href);
-
     const fr = new FileReader();
     fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result);
     fr.readAsDataURL(blob);
@@ -823,7 +960,6 @@ document.getElementById('gallery-btn').onclick = () => {
   const gal  = document.getElementById('gallery-content');
   gal.innerHTML = '';
   const keys = Object.keys(localStorage).filter(k => k.startsWith('saved-photo-')).sort().reverse();
-
   if (!keys.length){
     gal.innerHTML = '<p style="color:#fff">No saved images.</p>';
   }else{
@@ -836,18 +972,23 @@ document.getElementById('gallery-btn').onclick = () => {
   }
   document.getElementById('gallery-overlay').style.display = 'block';
 };
-document.getElementById('menu-exit-btn').onclick = () => controls.classList.remove('show');
 
 /* ---------- service worker & context menu ---------- */
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
 document.addEventListener('contextmenu', e => { if (e.target.id !== 'photo') e.preventDefault(); }, {passive:false});
 
 /* ---------- kick things off ---------- */
+function initSectionDefaults(){
+  // Start with minimal obstruction: everything collapsed.
+  collapseAllSections();
+  // But leave Film header open for quick profile switching WITHOUT its body
+  // (headers are small and don't cover the photo).
+}
 loadProfiles();
-refreshWBUI();
-refreshVignetteUI();
+refreshWBUI(); refreshVignetteUI(); refreshHalUI();
 bootCam();
 lockScroll();
+initSectionDefaults();
 </script>
 
 <div id="gallery-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:99;overflow:auto;padding:10px">
