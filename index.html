@@ -9,16 +9,30 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
   <style>
-:root { --menu-x: 20vw; } /* + = right, - = left */
+:root { --menu-x: 38vw;  /* + = right, - = left */
+        /* NEW: universal UI scale (lower value = smaller UI) */
+        --ui-scale: 0.5;
+}
     /* ---------- SHARED STYLES ---------- */
     body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:100vh;overflow:hidden}
     html{height:100vh;overflow:hidden}
+
+    /* NEW: wrapper that scales EVERYTHING inside */
+    #app{
+      position:fixed; /* creates a stable containing block for positioned children */
+      inset:0;
+      transform: scale(var(--ui-scale));
+      transform-origin: top left; /* keep coordinates stable */
+      width: calc(100% / var(--ui-scale));
+      height: calc(100% / var(--ui-scale));
+      pointer-events:auto;
+    }
 
     video,canvas,#photo{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
 #video{
   position:fixed;
   top: calc(env(safe-area-inset-top, 0px) + 6svh);
-  left:50%;
+  left:37%;
   transform: translateX(calc(-50% - 20vw));  /* tweak this value */
   object-position:center top;
   display:block;
@@ -88,6 +102,9 @@
 </head>
 <body>
 
+<!-- NEW: wrap EVERYTHING below in #app so the scale applies universally -->
+<div id="app">
+
 <select id="cameraSelect"></select>
 <video id="video" autoplay playsinline></video>
 <!-- We will use canvas as the preview; <img id="photo"> kept for compatibility but hidden -->
@@ -105,6 +122,11 @@
 <div id="cameraRadialMenu"></div>
 
 <div id="controls">
+  <!-- NEW: UI Scale slider (live, persistent) -->
+  <label>UI Scale (<span id="ui-scale-val">0.85</span>x)
+    <input type="range" id="ui-scale" min="0.60" max="1.20" step="0.01" value="0.85">
+  </label>
+
   <label>Film Simulation
     <select id="film">
       <option value="kodachrome">Kodachrome</option>
@@ -210,6 +232,10 @@ const vignetteSlider = document.getElementById('vignette');
 const vigVal = document.getElementById('vig-val');
 const saveProfileBtn = document.getElementById('save-profile-btn');
 
+/* NEW: UI scale controls */
+const uiScaleSlider = document.getElementById('ui-scale');
+const uiScaleVal = document.getElementById('ui-scale-val');
+
 /* ----- radial selector refs ----- */
 const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
 const cameraRadialMenu    = document.getElementById('cameraRadialMenu');
@@ -285,6 +311,24 @@ try{
   const savedVig = +localStorage.getItem('vignetteAmtV1');
   if (!isNaN(savedVig)) vignetteAmt = savedVig;
 }catch{}
+
+/* ---------- NEW: UI scale persistence ---------- */
+const UI_KEY = 'uiScaleV1';
+(function initUiScale(){
+  let s = parseFloat(localStorage.getItem(UI_KEY));
+  if (!(s > 0)) s = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 0.85;
+  document.documentElement.style.setProperty('--ui-scale', String(s));
+  if (uiScaleSlider){
+    uiScaleSlider.value = String(s.toFixed(2));
+    uiScaleVal.textContent = String(s.toFixed(2));
+    uiScaleSlider.addEventListener('input', () => {
+      const v = parseFloat(uiScaleSlider.value);
+      document.documentElement.style.setProperty('--ui-scale', String(v));
+      uiScaleVal.textContent = String(v.toFixed(2));
+      localStorage.setItem(UI_KEY, String(v));
+    });
+  }
+})();
 
 /* ---------- sliders & simple UI ---------- */
 grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; };
@@ -888,5 +932,7 @@ lockScroll();
   <button onclick="this.parentNode.style.display='none'" style="position:fixed;top:10px;right:10px;z-index:100;">Close</button>
   <div id="gallery-content" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:50px"></div>
 </div>
+
+</div> <!-- END #app wrapper -->
 </body>
 </html>
