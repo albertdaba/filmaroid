@@ -408,6 +408,58 @@ select {
   transform: translateX(22px);
 }
 
+/* ========== TRICOLOR WHEEL ========== */
+.tricolor-section {
+  margin-bottom: 16px;
+}
+
+.tricolor-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #fff;
+}
+
+.hue-wheel {
+  width: 100%;
+  height: 50px;
+  border-radius: 25px;
+  margin-bottom: 12px;
+  background: linear-gradient(to right, 
+    hsl(0, 100%, 50%),
+    hsl(30, 100%, 50%),
+    hsl(60, 100%, 50%),
+    hsl(90, 100%, 50%),
+    hsl(120, 100%, 50%),
+    hsl(150, 100%, 50%),
+    hsl(180, 100%, 50%),
+    hsl(210, 100%, 50%),
+    hsl(240, 100%, 50%),
+    hsl(270, 100%, 50%),
+    hsl(300, 100%, 50%),
+    hsl(330, 100%, 50%),
+    hsl(360, 100%, 50%)
+  );
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --indicator-left: 50%;
+}
+
+.hue-wheel::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  top: 50%;
+  left: var(--indicator-left);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
 /* ========== BUTTONS ========== */
 .btn-primary {
   width: 100%;
@@ -685,7 +737,7 @@ select {
     <div class="tab-panel" id="colors-panel">
       <div class="toggle-section">
         <input type="checkbox" id="cm-enable">
-        <label for="cm-enable">Enable Per-Color Adjustments</label>
+        <label for="cm-enable">Per-Color Adjustments</label>
       </div>
       
       <div id="cm-wrapper" style="display:none">
@@ -718,6 +770,78 @@ select {
         </div>
         
         <button class="btn-secondary" id="cm-reset">Reset All Colors</button>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="toggle-section">
+        <input type="checkbox" id="tricolor-enable">
+        <label for="tricolor-enable">Tricolor Wheel</label>
+      </div>
+      
+      <div id="tricolor-wrapper" style="display:none">
+        <div class="tricolor-section">
+          <div class="tricolor-label">Shadows</div>
+          <div class="hue-wheel" id="shadow-wheel"></div>
+          <div class="control-group">
+            <div class="control-label">
+              <span>Hue</span>
+              <span class="control-value" id="shadow-hue-val">180°</span>
+            </div>
+            <input type="range" id="shadow-hue" min="0" max="360" value="180">
+          </div>
+          <div class="control-group">
+            <div class="control-label">
+              <span>Strength</span>
+              <span class="control-value" id="shadow-str-val">0%</span>
+            </div>
+            <input type="range" id="shadow-strength" min="0" max="100" value="0">
+          </div>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <div class="tricolor-section">
+          <div class="tricolor-label">Midtones</div>
+          <div class="hue-wheel" id="midtone-wheel"></div>
+          <div class="control-group">
+            <div class="control-label">
+              <span>Hue</span>
+              <span class="control-value" id="midtone-hue-val">180°</span>
+            </div>
+            <input type="range" id="midtone-hue" min="0" max="360" value="180">
+          </div>
+          <div class="control-group">
+            <div class="control-label">
+              <span>Strength</span>
+              <span class="control-value" id="midtone-str-val">0%</span>
+            </div>
+            <input type="range" id="midtone-strength" min="0" max="100" value="0">
+          </div>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <div class="tricolor-section">
+          <div class="tricolor-label">Highlights</div>
+          <div class="hue-wheel" id="highlight-wheel"></div>
+          <div class="control-group">
+            <div class="control-label">
+              <span>Hue</span>
+              <span class="control-value" id="highlight-hue-val">180°</span>
+            </div>
+            <input type="range" id="highlight-hue" min="0" max="360" value="180">
+          </div>
+          <div class="control-group">
+            <div class="control-label">
+              <span>Strength</span>
+              <span class="control-value" id="highlight-str-val">0%</span>
+            </div>
+            <input type="range" id="highlight-strength" min="0" max="100" value="0">
+          </div>
+        </div>
+        
+        <button class="btn-secondary" id="tricolor-reset">Reset Tricolor</button>
       </div>
     </div>
   </div>
@@ -802,6 +926,15 @@ const WB_KEY = 'wbSettingsV1';
 let wb = { r:0, b:0 };
 let vignetteAmt = 0;
 
+/* ========== TRICOLOR WHEEL STATE ========== */
+const TRICOLOR_KEY = 'tricolorSettingsV1';
+let tricolorState = {
+  enable: false,
+  shadow: { hue: 180, strength: 0 },
+  midtone: { hue: 180, strength: 0 },
+  highlight: { hue: 180, strength: 0 }
+};
+
 /* ========== LOAD SAVED SETTINGS ========== */
 try {
   const saved = JSON.parse(localStorage.getItem(CM_KEY));
@@ -816,6 +949,11 @@ try {
 try {
   const savedVig = +localStorage.getItem('vignetteAmtV1');
   if (!isNaN(savedVig)) vignetteAmt = savedVig;
+} catch {}
+
+try {
+  const savedTricolor = JSON.parse(localStorage.getItem(TRICOLOR_KEY));
+  if (savedTricolor) tricolorState = savedTricolor;
 } catch {}
 
 /* ========== TABS ========== */
@@ -975,13 +1113,6 @@ function updateColorControls() {
   cmLVal.textContent = cmL.value;
 }
 
-cmEnable.addEventListener('change', () => {
-  cmState.enable = cmEnable.checked;
-  cmWrapper.style.display = cmState.enable ? 'block' : 'none';
-  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
-  if (lastFrameImageData) shootReprocess();
-});
-
 cmH.addEventListener('input', () => {
   cmState.dH[cmIdx] = (+cmH.value) / 360;
   cmHVal.textContent = cmH.value + '°';
@@ -1020,6 +1151,184 @@ cmEnable.checked = cmState.enable;
 cmWrapper.style.display = cmState.enable ? 'block' : 'none';
 buildColorPalette();
 updateColorControls();
+
+/* ========== TRICOLOR WHEEL ========== */
+const tricolorEnable = document.getElementById('tricolor-enable');
+const tricolorWrapper = document.getElementById('tricolor-wrapper');
+
+// Sliders
+const shadowHue = document.getElementById('shadow-hue');
+const shadowStr = document.getElementById('shadow-strength');
+const shadowHueVal = document.getElementById('shadow-hue-val');
+const shadowStrVal = document.getElementById('shadow-str-val');
+
+const midtoneHue = document.getElementById('midtone-hue');
+const midtoneStr = document.getElementById('midtone-strength');
+const midtoneHueVal = document.getElementById('midtone-hue-val');
+const midtoneStrVal = document.getElementById('midtone-str-val');
+
+const highlightHue = document.getElementById('highlight-hue');
+const highlightStr = document.getElementById('highlight-strength');
+const highlightHueVal = document.getElementById('highlight-hue-val');
+const highlightStrVal = document.getElementById('highlight-str-val');
+
+const tricolorReset = document.getElementById('tricolor-reset');
+
+// Color wheels
+const shadowWheel = document.getElementById('shadow-wheel');
+const midtoneWheel = document.getElementById('midtone-wheel');
+const highlightWheel = document.getElementById('highlight-wheel');
+
+function updateTricolorUI() {
+  tricolorEnable.checked = tricolorState.enable;
+  tricolorWrapper.style.display = tricolorState.enable ? 'block' : 'none';
+  
+  // Update shadow
+  shadowHue.value = tricolorState.shadow.hue;
+  shadowStr.value = tricolorState.shadow.strength;
+  shadowHueVal.textContent = tricolorState.shadow.hue + '°';
+  shadowStrVal.textContent = tricolorState.shadow.strength + '%';
+  updateWheelIndicator(shadowWheel, tricolorState.shadow.hue);
+  
+  // Update midtone
+  midtoneHue.value = tricolorState.midtone.hue;
+  midtoneStr.value = tricolorState.midtone.strength;
+  midtoneHueVal.textContent = tricolorState.midtone.hue + '°';
+  midtoneStrVal.textContent = tricolorState.midtone.strength + '%';
+  updateWheelIndicator(midtoneWheel, tricolorState.midtone.hue);
+  
+  // Update highlight
+  highlightHue.value = tricolorState.highlight.hue;
+  highlightStr.value = tricolorState.highlight.strength;
+  highlightHueVal.textContent = tricolorState.highlight.hue + '°';
+  highlightStrVal.textContent = tricolorState.highlight.strength + '%';
+  updateWheelIndicator(highlightWheel, tricolorState.highlight.hue);
+}
+
+function updateWheelIndicator(wheel, hue) {
+  const percent = (hue / 360) * 100;
+  wheel.style.setProperty('--indicator-left', percent + '%');
+}
+
+function saveTricolorState() {
+  localStorage.setItem(TRICOLOR_KEY, JSON.stringify(tricolorState));
+}
+
+// Mutual exclusivity
+tricolorEnable.addEventListener('change', () => {
+  tricolorState.enable = tricolorEnable.checked;
+  if (tricolorState.enable) {
+    cmState.enable = false;
+    cmEnable.checked = false;
+    cmWrapper.style.display = 'none';
+  }
+  tricolorWrapper.style.display = tricolorState.enable ? 'block' : 'none';
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+cmEnable.addEventListener('change', () => {
+  cmState.enable = cmEnable.checked;
+  if (cmState.enable) {
+    tricolorState.enable = false;
+    tricolorEnable.checked = false;
+    tricolorWrapper.style.display = 'none';
+  }
+  cmWrapper.style.display = cmState.enable ? 'block' : 'none';
+  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+// Shadow controls
+shadowHue.addEventListener('input', () => {
+  tricolorState.shadow.hue = +shadowHue.value;
+  shadowHueVal.textContent = tricolorState.shadow.hue + '°';
+  updateWheelIndicator(shadowWheel, tricolorState.shadow.hue);
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+shadowStr.addEventListener('input', () => {
+  tricolorState.shadow.strength = +shadowStr.value;
+  shadowStrVal.textContent = tricolorState.shadow.strength + '%';
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+// Midtone controls
+midtoneHue.addEventListener('input', () => {
+  tricolorState.midtone.hue = +midtoneHue.value;
+  midtoneHueVal.textContent = tricolorState.midtone.hue + '°';
+  updateWheelIndicator(midtoneWheel, tricolorState.midtone.hue);
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+midtoneStr.addEventListener('input', () => {
+  tricolorState.midtone.strength = +midtoneStr.value;
+  midtoneStrVal.textContent = tricolorState.midtone.strength + '%';
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+// Highlight controls
+highlightHue.addEventListener('input', () => {
+  tricolorState.highlight.hue = +highlightHue.value;
+  highlightHueVal.textContent = tricolorState.highlight.hue + '°';
+  updateWheelIndicator(highlightWheel, tricolorState.highlight.hue);
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+highlightStr.addEventListener('input', () => {
+  tricolorState.highlight.strength = +highlightStr.value;
+  highlightStrVal.textContent = tricolorState.highlight.strength + '%';
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+// Wheel click handlers
+function handleWheelClick(wheel, type) {
+  wheel.addEventListener('click', (e) => {
+    const rect = wheel.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = x / rect.width;
+    const hue = Math.round(percent * 360);
+    
+    tricolorState[type].hue = hue;
+    
+    if (type === 'shadow') {
+      shadowHue.value = hue;
+      shadowHueVal.textContent = hue + '°';
+    } else if (type === 'midtone') {
+      midtoneHue.value = hue;
+      midtoneHueVal.textContent = hue + '°';
+    } else {
+      highlightHue.value = hue;
+      highlightHueVal.textContent = hue + '°';
+    }
+    
+    updateWheelIndicator(wheel, hue);
+    saveTricolorState();
+    if (lastFrameImageData) shootReprocess();
+  });
+}
+
+handleWheelClick(shadowWheel, 'shadow');
+handleWheelClick(midtoneWheel, 'midtone');
+handleWheelClick(highlightWheel, 'highlight');
+
+tricolorReset.addEventListener('click', () => {
+  tricolorState.shadow = { hue: 180, strength: 0 };
+  tricolorState.midtone = { hue: 180, strength: 0 };
+  tricolorState.highlight = { hue: 180, strength: 0 };
+  updateTricolorUI();
+  saveTricolorState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+updateTricolorUI();
 
 /* ========== PROFILES ========== */
 function loadProfiles() {
@@ -1085,6 +1394,12 @@ function applyProfile(name) {
     localStorage.setItem('vignetteAmtV1', String(vignetteAmt));
   }
   
+  if (p.tricolorState) {
+    tricolorState = JSON.parse(JSON.stringify(p.tricolorState));
+    updateTricolorUI();
+    saveTricolorState();
+  }
+  
   if (lastFrameImageData) shootReprocess();
 }
 
@@ -1097,7 +1412,8 @@ document.getElementById('save-profile-btn').addEventListener('click', () => {
     grainAmt,
     cmState: JSON.parse(JSON.stringify(cmState)),
     wb: { ...wb },
-    vignetteAmt
+    vignetteAmt,
+    tricolorState: JSON.parse(JSON.stringify(tricolorState))
   };
   
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
@@ -1161,9 +1477,10 @@ document.getElementById('camera-switch').addEventListener('click', () => {
 /* ========== WORKER ========== */
 const workerSrc = `
 self.onmessage = (e) => {
-  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt } = e.data;
+  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt, tricolorState } = e.data;
   const d = imageData.data;
   const useColorMix = cmState.enable && film !== 'acros';
+  const useTricolor = tricolorState.enable && film !== 'acros';
 
   function rgbToHsv(r,g,b){
     r/=255; g/=255; b/=255;
@@ -1251,6 +1568,62 @@ self.onmessage = (e) => {
           s = Math.max(0, Math.min(1, s + dS));
           v = Math.max(0, Math.min(1, v + dL));
           [r,g,bl] = hsvToRgb(h,s,v);
+        }
+      }
+
+      // Tricolor grading (shadows/midtones/highlights)
+      if (useTricolor){
+        const lum = (r + g + bl) / 3;
+        const lumNorm = lum / 255; // 0 to 1
+        
+        // Determine luminance zone weights
+        let shadowWeight = 0, midtoneWeight = 0, highlightWeight = 0;
+        
+        if (lumNorm < 0.33) {
+          // Shadows zone
+          shadowWeight = 1 - (lumNorm / 0.33);
+          midtoneWeight = lumNorm / 0.33;
+        } else if (lumNorm < 0.67) {
+          // Midtones zone
+          const midPos = (lumNorm - 0.33) / 0.34;
+          midtoneWeight = 1 - Math.abs(midPos - 0.5) * 2;
+          if (lumNorm < 0.5) {
+            shadowWeight = 1 - midPos * 2;
+          } else {
+            highlightWeight = (midPos - 0.5) * 2;
+          }
+        } else {
+          // Highlights zone
+          highlightWeight = (lumNorm - 0.67) / 0.33;
+          midtoneWeight = 1 - highlightWeight;
+        }
+        
+        // Apply color tints based on strength
+        if (shadowWeight > 0 && tricolorState.shadow.strength > 0) {
+          const strength = (tricolorState.shadow.strength / 100) * shadowWeight;
+          const hue = tricolorState.shadow.hue;
+          const [tr, tg, tb] = hsvToRgb(hue / 360, 1, 1);
+          r = r * (1 - strength * 0.5) + tr * strength * 0.5;
+          g = g * (1 - strength * 0.5) + tg * strength * 0.5;
+          bl = bl * (1 - strength * 0.5) + tb * strength * 0.5;
+        }
+        
+        if (midtoneWeight > 0 && tricolorState.midtone.strength > 0) {
+          const strength = (tricolorState.midtone.strength / 100) * midtoneWeight;
+          const hue = tricolorState.midtone.hue;
+          const [tr, tg, tb] = hsvToRgb(hue / 360, 1, 1);
+          r = r * (1 - strength * 0.5) + tr * strength * 0.5;
+          g = g * (1 - strength * 0.5) + tg * strength * 0.5;
+          bl = bl * (1 - strength * 0.5) + tb * strength * 0.5;
+        }
+        
+        if (highlightWeight > 0 && tricolorState.highlight.strength > 0) {
+          const strength = (tricolorState.highlight.strength / 100) * highlightWeight;
+          const hue = tricolorState.highlight.hue;
+          const [tr, tg, tb] = hsvToRgb(hue / 360, 1, 1);
+          r = r * (1 - strength * 0.5) + tr * strength * 0.5;
+          g = g * (1 - strength * 0.5) + tg * strength * 0.5;
+          bl = bl * (1 - strength * 0.5) + tb * strength * 0.5;
         }
       }
 
@@ -1347,7 +1720,8 @@ async function shoot() {
     colors,
     hueWidth,
     wb,
-    vignetteAmt
+    vignetteAmt,
+    tricolorState
   }, [roi.data.buffer]);
 
   worker.onmessage = (e) => {
@@ -1375,7 +1749,8 @@ function shootReprocess() {
     colors,
     hueWidth,
     wb,
-    vignetteAmt
+    vignetteAmt,
+    tricolorState
   }, [roi.data.buffer]);
 
   worker.onmessage = (e) => {
