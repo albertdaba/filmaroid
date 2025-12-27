@@ -708,6 +708,39 @@ select {
       
       <div class="divider"></div>
       
+      <div class="toggle-section">
+        <input type="checkbox" id="halation-enable">
+        <label for="halation-enable">Halation Effect</label>
+      </div>
+      
+      <div id="halation-wrapper" style="display:none">
+        <div class="control-group">
+          <div class="control-label">
+            <span>Spread</span>
+            <span class="control-value" id="halation-blur-val">10</span>
+          </div>
+          <input type="range" id="halation-blur" min="0" max="50" value="10">
+        </div>
+        
+        <div class="control-group">
+          <div class="control-label">
+            <span>Strength</span>
+            <span class="control-value" id="halation-strength-val">50</span>
+          </div>
+          <input type="range" id="halation-strength" min="0" max="100" value="50">
+        </div>
+        
+        <div class="control-group">
+          <div class="control-label">
+            <span>Threshold</span>
+            <span class="control-value" id="halation-threshold-val">200</span>
+          </div>
+          <input type="range" id="halation-threshold" min="0" max="255" value="200">
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
       <div class="control-group">
         <div class="control-label">
           <span>White Balance - Red</span>
@@ -935,6 +968,15 @@ let tricolorState = {
   highlight: { hue: 180, strength: 0 }
 };
 
+/* ========== HALATION STATE ========== */
+const HALATION_KEY = 'halationSettingsV1';
+let halationState = {
+  enable: false,
+  blur: 10,
+  strength: 50,
+  threshold: 200
+};
+
 /* ========== LOAD SAVED SETTINGS ========== */
 try {
   const saved = JSON.parse(localStorage.getItem(CM_KEY));
@@ -954,6 +996,11 @@ try {
 try {
   const savedTricolor = JSON.parse(localStorage.getItem(TRICOLOR_KEY));
   if (savedTricolor) tricolorState = savedTricolor;
+} catch {}
+
+try {
+  const savedHalation = JSON.parse(localStorage.getItem(HALATION_KEY));
+  if (savedHalation) halationState = savedHalation;
 } catch {}
 
 /* ========== TABS ========== */
@@ -1074,6 +1121,61 @@ vigVal.textContent = vignetteAmt;
 wbRSlider.value = wb.r;
 wbBSlider.value = wb.b;
 vignetteSlider.value = vignetteAmt;
+
+/* ========== HALATION ========== */
+const halationEnable = document.getElementById('halation-enable');
+const halationWrapper = document.getElementById('halation-wrapper');
+const halationBlur = document.getElementById('halation-blur');
+const halationStrength = document.getElementById('halation-strength');
+const halationThreshold = document.getElementById('halation-threshold');
+const halationBlurVal = document.getElementById('halation-blur-val');
+const halationStrengthVal = document.getElementById('halation-strength-val');
+const halationThresholdVal = document.getElementById('halation-threshold-val');
+
+function updateHalationUI() {
+  halationEnable.checked = halationState.enable;
+  halationWrapper.style.display = halationState.enable ? 'block' : 'none';
+  halationBlur.value = halationState.blur;
+  halationStrength.value = halationState.strength;
+  halationThreshold.value = halationState.threshold;
+  halationBlurVal.textContent = halationState.blur;
+  halationStrengthVal.textContent = halationState.strength;
+  halationThresholdVal.textContent = halationState.threshold;
+}
+
+function saveHalationState() {
+  localStorage.setItem(HALATION_KEY, JSON.stringify(halationState));
+}
+
+halationEnable.addEventListener('change', () => {
+  halationState.enable = halationEnable.checked;
+  halationWrapper.style.display = halationState.enable ? 'block' : 'none';
+  saveHalationState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+halationBlur.addEventListener('input', () => {
+  halationState.blur = +halationBlur.value;
+  halationBlurVal.textContent = halationState.blur;
+  saveHalationState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+halationStrength.addEventListener('input', () => {
+  halationState.strength = +halationStrength.value;
+  halationStrengthVal.textContent = halationState.strength;
+  saveHalationState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+halationThreshold.addEventListener('input', () => {
+  halationState.threshold = +halationThreshold.value;
+  halationThresholdVal.textContent = halationState.threshold;
+  saveHalationState();
+  if (lastFrameImageData) shootReprocess();
+});
+
+updateHalationUI();
 
 /* ========== COLOR MIX ========== */
 const cmEnable = document.getElementById('cm-enable');
@@ -1400,6 +1502,12 @@ function applyProfile(name) {
     saveTricolorState();
   }
   
+  if (p.halationState) {
+    halationState = JSON.parse(JSON.stringify(p.halationState));
+    updateHalationUI();
+    saveHalationState();
+  }
+  
   if (lastFrameImageData) shootReprocess();
 }
 
@@ -1413,7 +1521,8 @@ document.getElementById('save-profile-btn').addEventListener('click', () => {
     cmState: JSON.parse(JSON.stringify(cmState)),
     wb: { ...wb },
     vignetteAmt,
-    tricolorState: JSON.parse(JSON.stringify(tricolorState))
+    tricolorState: JSON.parse(JSON.stringify(tricolorState)),
+    halationState: JSON.parse(JSON.stringify(halationState))
   };
   
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
@@ -1477,10 +1586,11 @@ document.getElementById('camera-switch').addEventListener('click', () => {
 /* ========== WORKER ========== */
 const workerSrc = `
 self.onmessage = (e) => {
-  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt, tricolorState } = e.data;
+  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt, tricolorState, halationState } = e.data;
   const d = imageData.data;
   const useColorMix = cmState.enable && film !== 'acros';
   const useTricolor = tricolorState.enable && film !== 'acros';
+  const useHalation = halationState.enable;
 
   function rgbToHsv(r,g,b){
     r/=255; g/=255; b/=255;
@@ -1665,6 +1775,134 @@ self.onmessage = (e) => {
     }
   }
 
+  // Apply halation effect (after all other processing)
+  if (useHalation) {
+    const { blur, strength, threshold } = halationState;
+    
+    // Step 1: Create a copy for thresholding
+    const brightPixels = new Uint8ClampedArray(d.length);
+    for (let i = 0; i < d.length; i += 4) {
+      const brightness = (d[i] + d[i+1] + d[i+2]) / 3;
+      if (brightness >= threshold) {
+        brightPixels[i] = 255;
+        brightPixels[i+1] = 255;
+        brightPixels[i+2] = 255;
+        brightPixels[i+3] = 255;
+      }
+    }
+    
+    // Step 2: Apply gaussian blur approximation (box blur)
+    const blurRadius = Math.max(1, Math.round(blur));
+    const blurred = new Uint8ClampedArray(brightPixels.length);
+    
+    // Horizontal blur pass
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
+          const nx = x + dx;
+          if (nx >= 0 && nx < W) {
+            const idx = (y * W + nx) * 4;
+            sumR += brightPixels[idx];
+            sumG += brightPixels[idx + 1];
+            sumB += brightPixels[idx + 2];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        blurred[idx] = sumR / count;
+        blurred[idx + 1] = sumG / count;
+        blurred[idx + 2] = sumB / count;
+      }
+    }
+    
+    // Vertical blur pass
+    const blurred2 = new Uint8ClampedArray(blurred.length);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
+          const ny = y + dy;
+          if (ny >= 0 && ny < H) {
+            const idx = (ny * W + x) * 4;
+            sumR += blurred[idx];
+            sumG += blurred[idx + 1];
+            sumB += blurred[idx + 2];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        blurred2[idx] = sumR / count;
+        blurred2[idx + 1] = sumG / count;
+        blurred2[idx + 2] = sumB / count;
+      }
+    }
+    
+    // Step 3: Convert to red channel only and apply strength
+    for (let i = 0; i < blurred2.length; i += 4) {
+      if (blurred2[i] > 0 || blurred2[i+1] > 0 || blurred2[i+2] > 0) {
+        const brightness = (blurred2[i] + blurred2[i+1] + blurred2[i+2]) / 3;
+        blurred2[i] = Math.min(255, brightness + strength);
+        blurred2[i+1] = 0;
+        blurred2[i+2] = 0;
+      }
+    }
+    
+    // Step 4: Apply second blur to red glow
+    const finalBlurred = new Uint8ClampedArray(blurred2.length);
+    
+    // Horizontal blur pass
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, count = 0;
+        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
+          const nx = x + dx;
+          if (nx >= 0 && nx < W) {
+            const idx = (y * W + nx) * 4;
+            sumR += blurred2[idx];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        finalBlurred[idx] = sumR / count;
+      }
+    }
+    
+    // Vertical blur pass
+    const finalBlurred2 = new Uint8ClampedArray(finalBlurred.length);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, count = 0;
+        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
+          const ny = y + dy;
+          if (ny >= 0 && ny < H) {
+            const idx = (ny * W + x) * 4;
+            sumR += finalBlurred[idx];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        finalBlurred2[idx] = sumR / count;
+      }
+    }
+    
+    // Step 5: Blend with original using screen mode
+    for (let i = 0; i < d.length; i += 4) {
+      const halationR = finalBlurred2[i];
+      if (halationR > 0) {
+        // Screen blend: 1 - (1-a) * (1-b)
+        const origR = d[i] / 255;
+        const origG = d[i+1] / 255;
+        const origB = d[i+2] / 255;
+        const halR = halationR / 255;
+        
+        d[i] = Math.min(255, (1 - (1 - origR) * (1 - halR)) * 255);
+        d[i+1] = Math.min(255, (1 - (1 - origG) * (1 - halR)) * 255);
+        d[i+2] = Math.min(255, (1 - (1 - origB) * (1 - halR)) * 255);
+      }
+    }
+  }
+
   self.postMessage({ imageData }, [imageData.data.buffer]);
 };
 `;
@@ -1721,7 +1959,8 @@ async function shoot() {
     hueWidth,
     wb,
     vignetteAmt,
-    tricolorState
+    tricolorState,
+    halationState
   }, [roi.data.buffer]);
 
   worker.onmessage = (e) => {
@@ -1750,7 +1989,8 @@ function shootReprocess() {
     hueWidth,
     wb,
     vignetteAmt,
-    tricolorState
+    tricolorState,
+    halationState
   }, [roi.data.buffer]);
 
   worker.onmessage = (e) => {
