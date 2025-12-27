@@ -1785,44 +1785,174 @@ self.onmessage = (e) => {
   const useTricolor = tricolorState.enable && film !== 'acros';
   const useHalation = halationState.enable;
 
-  function rgbToHsv(r,g,b){
-    r/=255; g/=255; b/=255;
-    const M = Math.max(r,g,b), m = Math.min(r,g,b), delt = M - m;
-    let h = 0;
-    if (delt > 1e-6){
-      if (M === r) h = ((g - b) / delt) % 6;
-      else if (M === g) h = (b - r) / delt + 2;
-      else h = (r - g) / delt + 4;
-      h /= 6; if (h<0) h+=1;
+  // ========== IMPROVED COLOR SPACE CONVERSIONS ==========
+  
+  // RGB to XYZ (D65 illuminant)
+  function rgbToXyz(r, g, b) {
+    r = r / 255; g = g / 255; b = b / 255;
+    
+    // Gamma correction (sRGB)
+    r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+    g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+    b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+    
+    // Linear RGB to XYZ (D65)
+    const x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
+    const y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
+    const z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
+    
+    return [x * 100, y * 100, z * 100];
+  }
+  
+  // XYZ to LAB
+  function xyzToLab(x, y, z) {
+    // D65 reference white
+    x = x / 95.047;
+    y = y / 100.000;
+    z = z / 108.883;
+    
+    const fx = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x + 16/116);
+    const fy = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y + 16/116);
+    const fz = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z + 16/116);
+    
+    const L = (116 * fy) - 16;
+    const a = 500 * (fx - fy);
+    const b = 200 * (fy - fz);
+    
+    return [L, a, b];
+  }
+  
+  // LAB to LCH (Cylindrical LAB)
+  function labToLch(L, a, b) {
+    const C = Math.sqrt(a * a + b * b);
+    let H = Math.atan2(b, a) * (180 / Math.PI);
+    if (H < 0) H += 360;
+    return [L, C, H];
+  }
+  
+  // LCH to LAB
+  function lchToLab(L, C, H) {
+    const hRad = H * (Math.PI / 180);
+    const a = C * Math.cos(hRad);
+    const b = C * Math.sin(hRad);
+    return [L, a, b];
+  }
+  
+  // LAB to XYZ
+  function labToXyz(L, a, b) {
+    let fy = (L + 16) / 116;
+    let fx = a / 500 + fy;
+    let fz = fy - b / 200;
+    
+    const xr = fx * fx * fx > 0.008856 ? fx * fx * fx : (fx - 16/116) / 7.787;
+    const yr = fy * fy * fy > 0.008856 ? fy * fy * fy : (fy - 16/116) / 7.787;
+    const zr = fz * fz * fz > 0.008856 ? fz * fz * fz : (fz - 16/116) / 7.787;
+    
+    return [xr * 95.047, yr * 100.000, zr * 108.883];
+  }
+  
+  // XYZ to RGB
+  function xyzToRgb(x, y, z) {
+    x = x / 100; y = y / 100; z = z / 100;
+    
+    let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
+    let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
+    let b = x *  0.0556434 + y * -0.2040259 + z *  1.0572252;
+    
+    // Gamma correction (sRGB)
+    r = r > 0.0031308 ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r;
+    g = g > 0.0031308 ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g;
+    b = b > 0.0031308 ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b;
+    
+    return [
+      Math.max(0, Math.min(255, Math.round(r * 255))),
+      Math.max(0, Math.min(255, Math.round(g * 255))),
+      Math.max(0, Math.min(255, Math.round(b * 255)))
+    ];
+  }
+  
+  // Direct RGB to LCH (convenience)
+  function rgbToLch(r, g, b) {
+    const [x, y, z] = rgbToXyz(r, g, b);
+    const [L, a, bLab] = xyzToLab(x, y, z);
+    return labToLch(L, a, bLab);
+  }
+  
+  // Direct LCH to RGB (convenience)
+  function lchToRgb(L, C, H) {
+    const [l, a, b] = lchToLab(L, C, H);
+    const [x, y, z] = labToXyz(l, a, b);
+    return xyzToRgb(x, y, z);
+  }
+
+  // ========== IMPROVED COLOR ADJUSTMENT FUNCTIONS ==========
+  
+  // New color ranges (wider, non-overlapping)
+  const colorRanges = [
+    { name: 'Red',     center: 0,   width: 40 },   // 340-40°
+    { name: 'Yellow',  center: 60,  width: 40 },   // 40-100°
+    { name: 'Green',   center: 140, width: 60 },   // 100-180°
+    { name: 'Cyan',    center: 190, width: 20 },   // 180-200°
+    { name: 'Blue',    center: 240, width: 60 },   // 200-280°
+    { name: 'Magenta', center: 310, width: 40 }    // 280-340°
+  ];
+  
+  // Smooth gaussian-like weight function
+  function getColorWeight(hue, center, width) {
+    let delta = Math.abs(hue - center);
+    
+    // Handle hue wrapping
+    if (delta > 180) delta = 360 - delta;
+    
+    const halfWidth = width / 2;
+    if (delta > halfWidth) return 0;
+    
+    // Gaussian-like falloff
+    const normalized = delta / halfWidth;
+    return Math.exp(-2 * normalized * normalized);
+  }
+  
+  // Map old 8-color indices to new 6-color system
+  function getAdjustmentsForHue(hue, cmState) {
+    // Map old color system to new
+    const mapping = [0, 1, 1, 2, 3, 4, 5, 5]; // Red, Orange→Yellow, Yellow, Green, Aqua→Cyan, Blue, Purple→Magenta, Magenta
+    
+    let totalSat = 0, totalLum = 0, totalWeight = 0;
+    
+    for (let i = 0; i < colorRanges.length; i++) {
+      const range = colorRanges[i];
+      const weight = getColorWeight(hue, range.center, range.width);
+      
+      if (weight > 0.01) {
+        // Find which old color indices map to this range
+        const oldIndices = [];
+        for (let j = 0; j < mapping.length; j++) {
+          if (mapping[j] === i) oldIndices.push(j);
+        }
+        
+        // Average adjustments from mapped old colors
+        let avgS = 0, avgL = 0;
+        for (const idx of oldIndices) {
+          avgS += cmState.dS[idx] || 0;
+          avgL += cmState.dL[idx] || 0;
+        }
+        avgS /= oldIndices.length;
+        avgL /= oldIndices.length;
+        
+        totalSat += avgS * weight;
+        totalLum += avgL * weight;
+        totalWeight += weight;
+      }
     }
-    const s = M <= 1e-6 ? 0 : delt / M;
-    return [h, s, M];
-  }
-  
-  function hsvToRgb(h,s,v){
-    h = (h%1+1)%1;
-    const x = h*6, i = Math.floor(x), f = x - i;
-    const p = v*(1-s), q = v*(1-s*f), t = v*(1-s*(1-f));
-    let r,g,b;
-    if (i===0){ r=v; g=t; b=p; }
-    else if (i===1){ r=q; g=v; b=p; }
-    else if (i===2){ r=p; g=v; b=t; }
-    else if (i===3){ r=p; g=q; b=v; }
-    else if (i===4){ r=t; g=p; b=v; }
-    else { r=v; g=p; b=q; }
-    return [Math.max(0,Math.min(255,Math.round(r*255))),
-            Math.max(0,Math.min(255,Math.round(g*255))),
-            Math.max(0,Math.min(255,Math.round(b*255)))];
-  }
-  
-  function hueDelta(a,b){ const d = Math.abs(a-b); return Math.min(d, 1 - d); }
-  function bucketWeight(h, s, center, halfWidth){
-    const dh = hueDelta(h, center);
-    if (dh >= halfWidth) return 0;
-    const wHue = 0.5 * (1 + Math.cos(Math.PI * (dh/halfWidth)));
-    const minChroma = 0.02, maxChroma = 0.95;
-    const gate = Math.min(1, Math.max(0, (s - minChroma) / (maxChroma - minChroma)));
-    return wHue * gate;
+    
+    if (totalWeight > 0) {
+      return {
+        sat: totalSat / totalWeight,
+        lum: totalLum / totalWeight
+      };
+    }
+    
+    return { sat: 0, lum: 0 };
   }
 
   let seed = 1234567;
@@ -1844,6 +1974,7 @@ self.onmessage = (e) => {
       const i = (y*W + x) * 4;
       let r = d[i], g = d[i+1], bl = d[i+2];
 
+      // Film simulation base
       if (film === 'acros'){
         const a = (r+g+bl)/3;
         r=g=bl=a;
@@ -1854,100 +1985,114 @@ self.onmessage = (e) => {
         bl = bl*.85 + a*.15;
       }
 
+      // ========== IMPROVED PER-COLOR ADJUSTMENTS (LCH) ==========
       if (useColorMix){
-        let [h, s, v] = rgbToHsv(r,g,bl);
-        let dH=0, dS=0, dL=0, sumW=0;
-        for (let k=0; k<8; k++){
-          const w = bucketWeight(h, s, colors[k].center, hueWidth[k]);
-          if (w>0){
-            sumW += w;
-            dH += w * (cmState.dH[k] || 0);
-            dS += w * (cmState.dS[k] || 0);
-            dL += w * (cmState.dL[k] || 0);
-          }
+        let [L, C, H] = rgbToLch(r, g, bl);
+        
+        // Only adjust colored pixels (not grays)
+        if (C > 5) {
+          const adj = getAdjustmentsForHue(H, cmState);
+          
+          // Apply saturation adjustment (chroma in LCH)
+          // Scale based on current chroma to avoid over-saturation
+          const chromaMultiplier = 1 + (adj.sat * 0.8);
+          C = Math.max(0, Math.min(130, C * chromaMultiplier));
+          
+          // Apply luminance adjustment
+          // Perceptually uniform in LAB space
+          L = Math.max(0, Math.min(100, L + adj.lum * 40));
         }
-        if (sumW>0){
-          h = h + dH;
-          s = Math.max(0, Math.min(1, s + dS));
-          v = Math.max(0, Math.min(1, v + dL));
-          [r,g,bl] = hsvToRgb(h,s,v);
-        }
+        
+        [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // Tricolor grading (shadows/midtones/highlights)
+      // ========== IMPROVED TRICOLOR GRADING (LCH) ==========
       if (useTricolor){
-        const lum = (r + g + bl) / 3;
-        const lumNorm = lum / 255; // 0 to 1
+        let [L, C, H] = rgbToLch(r, g, bl);
         
-        // Determine luminance zone weights
+        // Determine luminance zone with smooth transitions
+        const lumNorm = L / 100;
         let shadowWeight = 0, midtoneWeight = 0, highlightWeight = 0;
         
-        if (lumNorm < 0.33) {
-          // Shadows zone
-          shadowWeight = 1 - (lumNorm / 0.33);
-          midtoneWeight = lumNorm / 0.33;
-        } else if (lumNorm < 0.67) {
-          // Midtones zone
-          const midPos = (lumNorm - 0.33) / 0.34;
-          midtoneWeight = 1 - Math.abs(midPos - 0.5) * 2;
-          if (lumNorm < 0.5) {
-            shadowWeight = 1 - midPos * 2;
-          } else {
-            highlightWeight = (midPos - 0.5) * 2;
-          }
+        // Smoother zone transitions using gaussians
+        if (lumNorm < 0.5) {
+          shadowWeight = Math.exp(-8 * (lumNorm - 0.15) * (lumNorm - 0.15));
+          midtoneWeight = Math.exp(-8 * (lumNorm - 0.4) * (lumNorm - 0.4));
         } else {
-          // Highlights zone
-          highlightWeight = (lumNorm - 0.67) / 0.33;
-          midtoneWeight = 1 - highlightWeight;
+          midtoneWeight = Math.exp(-8 * (lumNorm - 0.6) * (lumNorm - 0.6));
+          highlightWeight = Math.exp(-8 * (lumNorm - 0.85) * (lumNorm - 0.85));
         }
         
-        // Apply color tints based on strength
-        if (shadowWeight > 0 && tricolorState.shadow.strength > 0) {
+        // Normalize weights
+        const totalWeight = shadowWeight + midtoneWeight + highlightWeight;
+        if (totalWeight > 0) {
+          shadowWeight /= totalWeight;
+          midtoneWeight /= totalWeight;
+          highlightWeight /= totalWeight;
+        }
+        
+        // Apply color tints as hue shifts with strength modulation
+        let hueShift = 0;
+        let chromaBoost = 0;
+        
+        if (shadowWeight > 0.1 && tricolorState.shadow.strength > 0) {
           const strength = (tricolorState.shadow.strength / 100) * shadowWeight;
-          const hue = tricolorState.shadow.hue;
-          const [tr, tg, tb] = hsvToRgb(hue / 360, 1, 1);
-          r = r * (1 - strength * 0.5) + tr * strength * 0.5;
-          g = g * (1 - strength * 0.5) + tg * strength * 0.5;
-          bl = bl * (1 - strength * 0.5) + tb * strength * 0.5;
+          const targetHue = tricolorState.shadow.hue;
+          
+          // Calculate shortest path to target hue
+          let hueDelta = targetHue - H;
+          if (hueDelta > 180) hueDelta -= 360;
+          if (hueDelta < -180) hueDelta += 360;
+          
+          hueShift += hueDelta * strength * 0.3;
+          chromaBoost += strength * 20;
         }
         
-        if (midtoneWeight > 0 && tricolorState.midtone.strength > 0) {
+        if (midtoneWeight > 0.1 && tricolorState.midtone.strength > 0) {
           const strength = (tricolorState.midtone.strength / 100) * midtoneWeight;
-          const hue = tricolorState.midtone.hue;
-          const [tr, tg, tb] = hsvToRgb(hue / 360, 1, 1);
-          r = r * (1 - strength * 0.5) + tr * strength * 0.5;
-          g = g * (1 - strength * 0.5) + tg * strength * 0.5;
-          bl = bl * (1 - strength * 0.5) + tb * strength * 0.5;
+          const targetHue = tricolorState.midtone.hue;
+          
+          let hueDelta = targetHue - H;
+          if (hueDelta > 180) hueDelta -= 360;
+          if (hueDelta < -180) hueDelta += 360;
+          
+          hueShift += hueDelta * strength * 0.3;
+          chromaBoost += strength * 20;
         }
         
-        if (highlightWeight > 0 && tricolorState.highlight.strength > 0) {
+        if (highlightWeight > 0.1 && tricolorState.highlight.strength > 0) {
           const strength = (tricolorState.highlight.strength / 100) * highlightWeight;
-          const hue = tricolorState.highlight.hue;
-          const [tr, tg, tb] = hsvToRgb(hue / 360, 1, 1);
-          r = r * (1 - strength * 0.5) + tr * strength * 0.5;
-          g = g * (1 - strength * 0.5) + tg * strength * 0.5;
-          bl = bl * (1 - strength * 0.5) + tb * strength * 0.5;
+          const targetHue = tricolorState.highlight.hue;
+          
+          let hueDelta = targetHue - H;
+          if (hueDelta > 180) hueDelta -= 360;
+          if (hueDelta < -180) hueDelta += 360;
+          
+          hueShift += hueDelta * strength * 0.3;
+          chromaBoost += strength * 20;
         }
+        
+        // Apply adjustments
+        H = (H + hueShift + 360) % 360;
+        C = Math.max(0, Math.min(130, C + chromaBoost));
+        
+        [r, g, bl] = lchToRgb(L, C, H);
       }
 
       r = r * gainR;
       bl = bl * gainB;
 
       if (grainAmt > 0){
-        // Exponential scaling for more subtle low-end control
-        // grainAmt 0-50 maps to actualIntensity 0-20 with exponential curve
-        const normalizedGrain = grainAmt / 50; // 0 to 1
+        const normalizedGrain = grainAmt / 50;
         const actualIntensity = Math.pow(normalizedGrain, 1.8) * 20;
         
-        // Generate grain for each channel with slight variation
         const baseNoise = fastNoise();
         const rNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
         const gNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
         const bNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
         
-        // Apply grain with luminance-dependent intensity (more visible in midtones)
         const lum = (r + g + bl) / 3;
-        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.6; // Peaks at midtones
+        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.6;
         
         r += rNoise * lumFactor;
         g += gNoise * lumFactor;
@@ -1972,7 +2117,6 @@ self.onmessage = (e) => {
   if (useHalation) {
     const { blur, strength, threshold } = halationState;
     
-    // Step 1: Create a copy for thresholding
     const brightPixels = new Uint8ClampedArray(d.length);
     for (let i = 0; i < d.length; i += 4) {
       const brightness = (d[i] + d[i+1] + d[i+2]) / 3;
@@ -1984,11 +2128,9 @@ self.onmessage = (e) => {
       }
     }
     
-    // Step 2: Apply gaussian blur approximation (box blur)
     const blurRadius = Math.max(1, Math.round(blur));
     const blurred = new Uint8ClampedArray(brightPixels.length);
     
-    // Horizontal blur pass
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         let sumR = 0, sumG = 0, sumB = 0, count = 0;
@@ -2009,7 +2151,6 @@ self.onmessage = (e) => {
       }
     }
     
-    // Vertical blur pass
     const blurred2 = new Uint8ClampedArray(blurred.length);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -2031,7 +2172,6 @@ self.onmessage = (e) => {
       }
     }
     
-    // Step 3: Convert to red channel only and apply strength
     for (let i = 0; i < blurred2.length; i += 4) {
       if (blurred2[i] > 0 || blurred2[i+1] > 0 || blurred2[i+2] > 0) {
         const brightness = (blurred2[i] + blurred2[i+1] + blurred2[i+2]) / 3;
@@ -2041,10 +2181,7 @@ self.onmessage = (e) => {
       }
     }
     
-    // Step 4: Apply second blur to red glow
     const finalBlurred = new Uint8ClampedArray(blurred2.length);
-    
-    // Horizontal blur pass
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         let sumR = 0, count = 0;
@@ -2061,7 +2198,6 @@ self.onmessage = (e) => {
       }
     }
     
-    // Vertical blur pass
     const finalBlurred2 = new Uint8ClampedArray(finalBlurred.length);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -2079,11 +2215,9 @@ self.onmessage = (e) => {
       }
     }
     
-    // Step 5: Blend with original using screen mode
     for (let i = 0; i < d.length; i += 4) {
       const halationR = finalBlurred2[i];
       if (halationR > 0) {
-        // Screen blend: 1 - (1-a) * (1-b)
         const origR = d[i] / 255;
         const origG = d[i+1] / 255;
         const origB = d[i+2] / 255;
