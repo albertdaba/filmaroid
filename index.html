@@ -148,7 +148,7 @@ canvas, #photo {
   right: 0;
   background: #1c1c1e;
   border-radius: 20px 20px 0 0;
-  transform: translateY(calc(100% - 60px));
+  transform: translateY(100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 50;
   max-height: 70vh;
@@ -1401,9 +1401,13 @@ document.getElementById('text-cancel').addEventListener('click', () => {
   textInput.value = '';
 });
 
-document.getElementById('text-submit').addEventListener('click', () => {
+document.getElementById('text-submit').addEventListener('click', async () => {
   userText = textInput.value.trim();
   if (userText) {
+    // Ensure font is loaded before drawing
+    if (document.fonts) {
+      await document.fonts.load('131px "Mrs Saint Delafield"').catch(() => {});
+    }
     updateText();
   }
   textModal.style.display = 'none';
@@ -1413,7 +1417,9 @@ document.getElementById('text-submit').addEventListener('click', () => {
 function updateText() {
   if (!dim) return;
   const ctx = canvas.getContext('2d');
+  // Restore the processed image WITHOUT text
   if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
+  // Draw text fresh on top
   drawText(ctx);
 }
 
@@ -1421,18 +1427,23 @@ function drawText(ctx) {
   if (!userText || !dim) return;
   const { fw, fh, bot } = dim;
   
+  // Ensure font is loaded before drawing
+  if (document.fonts) {
+    document.fonts.load('131px "Mrs Saint Delafield"').catch(() => {});
+  }
+  
   let fs = 131;
-  ctx.font = `${fs}px "Mrs Saint Delafield"`;
+  ctx.font = `${fs}px "Mrs Saint Delafield", cursive`;
   while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
     fs--;
-    ctx.font = `${fs}px "Mrs Saint Delafield"`;
+    ctx.font = `${fs}px "Mrs Saint Delafield", cursive`;
   }
   
   ctx.fillStyle = '#000';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(userText, fw / 2, fh - bot / 2);
-  lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
+  // DO NOT update lastFrameImageData here - it should stay as the image without text
 }
 
 /* ========== NEXT/RESET ========== */
