@@ -311,6 +311,7 @@ select {
   cursor: pointer;
   text-align: center;
   transition: all 0.2s;
+  position: relative;
 }
 
 .preset-card:active {
@@ -320,6 +321,50 @@ select {
 .preset-card.active {
   background: rgba(0,122,255,0.2);
   border-color: #007aff;
+}
+
+.preset-share-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0,122,255,0.8);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.preset-share-btn:active {
+  transform: scale(0.9);
+}
+
+.preset-delete-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255,59,48,0.8);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.preset-delete-btn:active {
+  transform: scale(0.9);
 }
 
 .preset-name {
@@ -686,6 +731,7 @@ select {
       <div id="custom-profiles"></div>
       
       <button class="btn-secondary" id="save-profile-btn">Save Current as Profile</button>
+      <button class="btn-secondary" id="import-preset-btn">Import Shared Preset</button>
     </div>
     
     <!-- EFFECTS TAB -->
@@ -1446,18 +1492,56 @@ function renderProfiles() {
   container.innerHTML = '';
   
   Object.keys(profiles).forEach(name => {
+    const profile = profiles[name];
+    const isImported = profile._imported === true;
+    
     const card = document.createElement('div');
     card.className = 'preset-card';
+    
+    // Only add share button if NOT imported
+    const shareButtonHTML = isImported 
+      ? '' 
+      : '<button class="preset-share-btn" title="Share preset">📤</button>';
+    
+    const descText = isImported ? 'Received preset' : 'Custom profile';
+    
     card.innerHTML = `
+      <button class="preset-delete-btn" title="Delete preset">🗑️</button>
+      ${shareButtonHTML}
       <div class="preset-name">${name}</div>
-      <div class="preset-desc">Custom profile</div>
+      <div class="preset-desc">${descText}</div>
     `;
-    card.addEventListener('click', () => {
+    
+    // Click on card to load preset
+    card.addEventListener('click', (e) => {
+      // Don't trigger if clicking action buttons
+      if (e.target.classList.contains('preset-share-btn') || 
+          e.target.classList.contains('preset-delete-btn')) return;
+      
       document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       activeProfileName = name;
       applyProfile(name);
     });
+    
+    // Delete button functionality
+    const deleteBtn = card.querySelector('.preset-delete-btn');
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deletePreset(name);
+    });
+    
+    // Share button functionality (only if not imported)
+    if (!isImported) {
+      const shareBtn = card.querySelector('.preset-share-btn');
+      if (shareBtn) {
+        shareBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await sharePreset(name);
+        });
+      }
+    }
+    
     container.appendChild(card);
   });
 }
@@ -1511,6 +1595,111 @@ function applyProfile(name) {
   if (lastFrameImageData) shootReprocess();
 }
 
+/* ========== PRESET SHARING ========== */
+function deletePreset(presetName) {
+  if (!confirm(`Delete preset "${presetName}"?\n\nThis cannot be undone.`)) {
+    return;
+  }
+  
+  // Remove from profiles object
+  delete profiles[presetName];
+  
+  // Save to localStorage
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
+  
+  // If this was the active profile, clear it
+  if (activeProfileName === presetName) {
+    activeProfileName = null;
+  }
+  
+  // Refresh UI
+  renderProfiles();
+}
+
+async function sharePreset(presetName) {
+  const preset = profiles[presetName];
+  if (!preset) return;
+  
+  // Create shareable package
+  const sharePackage = {
+    v: 1, // version
+    n: presetName, // name
+    d: preset, // data
+    t: Date.now() // timestamp
+  };
+  
+  // Encode to base64
+  const jsonStr = JSON.stringify(sharePackage);
+  const encoded = btoa(encodeURIComponent(jsonStr));
+  
+  // Copy to clipboard
+  try {
+    await navigator.clipboard.writeText(encoded);
+    alert(`✅ Preset "${presetName}" copied to clipboard!\n\nShare this code with your friend.`);
+    
+    // Auto-clear clipboard after 60 seconds
+    setTimeout(async () => {
+      try {
+        const current = await navigator.clipboard.readText();
+        if (current === encoded) {
+          await navigator.clipboard.writeText('null');
+        }
+      } catch {}
+    }, 60000);
+  } catch (err) {
+    // Fallback: show in prompt
+    prompt('Copy this preset code:', encoded);
+  }
+}
+
+async function importPreset() {
+  let code = prompt('Paste the preset code you received:');
+  if (!code || code.trim() === '' || code.trim() === 'null') return;
+  
+  code = code.trim();
+  
+  try {
+    // Decode from base64
+    const jsonStr = decodeURIComponent(atob(code));
+    const sharePackage = JSON.parse(jsonStr);
+    
+    // Validate structure
+    if (!sharePackage.v || !sharePackage.n || !sharePackage.d) {
+      throw new Error('Invalid preset format');
+    }
+    
+    // Check if preset already exists
+    let finalName = sharePackage.n;
+    let counter = 1;
+    while (profiles[finalName]) {
+      finalName = `${sharePackage.n} (${counter})`;
+      counter++;
+    }
+    
+    // Mark as imported (non-shareable)
+    const importedPreset = sharePackage.d;
+    importedPreset._imported = true;
+    importedPreset._importedAt = Date.now();
+    
+    // Save as permanent preset
+    profiles[finalName] = importedPreset;
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
+    
+    // Refresh UI
+    renderProfiles();
+    
+    // Clear clipboard
+    try {
+      await navigator.clipboard.writeText('null');
+    } catch {}
+    
+    alert(`✅ Preset "${finalName}" imported successfully!`);
+    
+  } catch (err) {
+    alert('❌ Invalid preset code. Please check and try again.');
+  }
+}
+
 document.getElementById('save-profile-btn').addEventListener('click', () => {
   const name = prompt('Profile name?');
   if (!name) return;
@@ -1528,6 +1717,10 @@ document.getElementById('save-profile-btn').addEventListener('click', () => {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
   renderProfiles();
   alert('Profile saved: ' + name);
+});
+
+document.getElementById('import-preset-btn').addEventListener('click', () => {
+  importPreset();
 });
 
 /* ========== CAMERA ========== */
