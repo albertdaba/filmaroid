@@ -2,610 +2,1145 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Camera PWA – Film App (Fast)</title>
+  <title>Camera PWA – Film App (Mobile Optimized)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#000000">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
   <style>
-:root { --menu-x: 38vw;  /* + = right, - = left */
-        /* NEW: universal UI scale (lower value = smaller UI) */
-        --ui-scale: 0.5;
-}
-    /* ---------- SHARED STYLES ---------- */
-    body{margin:0;background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:100vh;overflow:hidden}
-    html{height:100vh;overflow:hidden}
-
-    /* NEW: wrapper that scales EVERYTHING inside */
-    #app{
-      position:fixed; /* creates a stable containing block for positioned children */
-      inset:0;
-      transform: scale(var(--ui-scale));
-      transform-origin: top left; /* keep coordinates stable */
-      width: calc(100% / var(--ui-scale));
-      height: calc(100% / var(--ui-scale));
-      pointer-events:auto;
-    }
-
-    video,canvas,#photo{width:100%;max-width:480px;aspect-ratio:3/4;object-fit:contain;background:#000}
-#video{
-  position:fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 6svh);
-  left:37%;
-  transform: translateX(calc(-50% - 20vw));  /* tweak this value */
-  object-position:center top;
-  display:block;
-  margin:0;
-  z-index:5;
+:root {
+  --ui-scale: 1;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
-    #menu-exit-btn,#gallery-btn,#calibrate-btn,#save-profile-btn{padding:8px;font-size:16px;border:1px solid #fff;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
-    #shutter{position:fixed;right:20px;bottom:50%;transform:translateY(50%);width:70px;height:70px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.1);cursor:pointer;z-index:10}
-    #save-btn{position:fixed;bottom:20px;left:calc(50% + 100px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
-    #menu-btn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:26px;text-align:center;line-height:44px;backdrop-filter:blur(6px);cursor:pointer;z-index:11}
-    #next-btn{position:fixed;right:20px;top:25%;transform:translateY(-50%);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;cursor:pointer;display:none;z-index:12}
-
-    /* ---------- RADIAL SELECTOR ---------- */
-    #cameraRadialTrigger{position:fixed;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:24px;text-align:center;line-height:44px;cursor:pointer;z-index:20;backdrop-filter:blur(6px);user-select:none;-webkit-user-select:none}
-    #cameraRadialMenu{position:fixed;left:44px;top:50%;width:200px;height:200px;margin-left:-20px;margin-top:-100px;pointer-events:none;z-index:21}
-    .camera-option{position:absolute;background:rgba(255,255,255,.15);border:1px solid #fff;color:#fff;padding:6px 12px;border-radius:6px;font-size:14px;cursor:pointer;white-space:nowrap;pointer-events:auto;transform:translate(-50%,-50%);transition:background .2s}
-
-    /* ---------- OTHER CONTROLS ---------- */
-   #controls{
-  position:absolute;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
-  left:50%;
-  transform: translateX(calc(-50% + var(--menu-x))) translateY(100%);
-  background:rgba(0,0,0,.85);
-  padding:12px;
-  border-radius:10px;
-  transition:.3s ease;
-  opacity:0;
-  pointer-events:none;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  width:calc(100% - 32px);
-  max-width:480px;
-  z-index:20;
+* { 
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-#controls.show{
-  transform: translateX(calc(-50% + var(--menu-x))) translateY(0);
-  opacity:1;
-  pointer-events:auto;
+body {
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }
-    #photo{user-select:auto;-webkit-user-select:auto;pointer-events:auto}
-    input[type=range],select{width:100%}
-    label{font-size:14px}
-    #cameraSelect{display:none}
-    *{user-select:none;-webkit-user-select:none}
 
-    /* ---------- TEXT OVERLAY ---------- */
-    #text-btn{position:fixed;bottom:20px;left:calc(50% - 120px);font-size:18px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer;z-index:12}
-    #text-input-modal{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);padding:12px;border-radius:10px;display:flex;gap:10px;width:calc(100% - 32px);max-width:480px;z-index:25}
-    #text-input{flex:1;padding:6px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:16px;user-select:auto;-webkit-user-select:auto}
-    #text-submit,#text-cancel{padding:6px 12px;border:1px solid #fff;border-radius:4px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer}
+/* ========== VIEWFINDER ========== */
+#viewfinder-container {
+  position: fixed;
+  top: var(--safe-top);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
 
-    /* ---------- COLOR MIX UI ---------- */
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .chip{width:26px;height:26px;border-radius:50%;border:2px solid #fff;cursor:pointer;box-shadow:0 0 0 2px rgba(255,255,255,.15) inset}
-    .chip.sel{box-shadow:0 0 0 3px #fff inset}
-    .small{font-size:12px;opacity:.9}
-    .divider{height:1px;background:rgba(255,255,255,.2);margin:4px 0}
+video, canvas, #photo {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 3/4;
+  object-fit: contain;
+  background: #000;
+}
 
-    /* ---------- PROCESSING OVERLAY ---------- */
-    #processing{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:30;font-size:16px}
-    #hint{font-size:12px;opacity:.8}
+#video {
+  display: block;
+}
+
+canvas, #photo {
+  display: none;
+}
+
+/* ========== TOP BAR ========== */
+#top-bar {
+  position: fixed;
+  top: var(--safe-top);
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#top-bar button {
+  pointer-events: auto;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+
+/* ========== SHUTTER & CONTROLS BAR ========== */
+#bottom-controls {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 20px);
+  left: 0;
+  right: 0;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 20px;
+  z-index: 10;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+}
+
+#shutter {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: rgba(255,255,255,0.1);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+#shutter:active {
+  transform: scale(0.95);
+}
+
+#menu-trigger, #next-btn, #save-btn, #text-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+#next-btn, #save-btn, #text-btn {
+  display: none;
+}
+
+/* ========== BOTTOM SHEET ========== */
+#bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1c1c1e;
+  border-radius: 20px 20px 0 0;
+  transform: translateY(calc(100% - 60px));
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--safe-bottom);
+}
+
+#bottom-sheet.expanded {
+  transform: translateY(0);
+}
+
+#sheet-handle {
+  width: 40px;
+  height: 5px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 3px;
+  margin: 12px auto 8px;
+  cursor: grab;
+}
+
+#sheet-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0 20px 15px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ========== TABS ========== */
+#tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  background: #1c1c1e;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.tab {
+  flex: 1;
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+  color: #fff;
+  border-bottom-color: #007aff;
+}
+
+/* ========== TAB CONTENT ========== */
+#tab-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-panel {
+  display: none;
+  padding: 20px;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+/* ========== FORM CONTROLS ========== */
+.control-group {
+  margin-bottom: 24px;
+}
+
+.control-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.8);
+}
+
+.control-value {
+  color: #007aff;
+  font-weight: 600;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 36px;
+  -webkit-appearance: none;
+  background: transparent;
+  margin: 0;
+}
+
+input[type="range"]::-webkit-slider-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  margin-top: -10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+input[type="range"]::-moz-range-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ========== PRESET GRID ========== */
+#preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.preset-card {
+  padding: 20px 16px;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.preset-card:active {
+  transform: scale(0.98);
+}
+
+.preset-card.active {
+  background: rgba(0,122,255,0.2);
+  border-color: #007aff;
+}
+
+.preset-name {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.preset-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+}
+
+/* ========== COLOR MIX ========== */
+.color-palette {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.color-chip {
+  min-width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.color-chip.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+}
+
+.color-info {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+
+.toggle-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.toggle-section input[type="checkbox"] {
+  width: 50px;
+  height: 28px;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.2);
+  border-radius: 14px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-section input[type="checkbox"]:checked {
+  background: #007aff;
+}
+
+.toggle-section input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.toggle-section input[type="checkbox"]:checked::before {
+  transform: translateX(22px);
+}
+
+/* ========== BUTTONS ========== */
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: #007aff;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:active {
+  opacity: 0.8;
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+/* ========== PROCESSING OVERLAY ========== */
+#processing {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  font-size: 16px;
+  backdrop-filter: blur(5px);
+}
+
+/* ========== TEXT MODAL ========== */
+#text-modal {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 20px);
+  left: 20px;
+  right: 20px;
+  background: #1c1c1e;
+  padding: 20px;
+  border-radius: 16px;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 60;
+}
+
+#text-modal input {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+#text-modal .modal-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+#text-modal .modal-buttons button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ========== GALLERY ========== */
+#gallery-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  padding: var(--safe-top) 0 var(--safe-bottom) 0;
+}
+
+#gallery-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+#gallery-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+#gallery-content img {
+  width: 100%;
+  border-radius: 8px;
+  aspect-ratio: 3/4;
+  object-fit: cover;
+}
+
+/* ========== CAMERA SELECTOR ========== */
+#camera-selector {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 120px);
+  left: 20px;
+  background: rgba(0,0,0,0.8);
+  border-radius: 12px;
+  padding: 12px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  backdrop-filter: blur(10px);
+  z-index: 15;
+}
+
+.camera-option {
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 150px;
+}
+
+.camera-option:active {
+  background: rgba(255,255,255,0.2);
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255,255,255,0.1);
+  margin: 16px 0;
+}
+
+#photo {
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
   </style>
 </head>
 <body>
 
-<!-- NEW: wrap EVERYTHING below in #app so the scale applies universally -->
-<div id="app">
-
-<select id="cameraSelect"></select>
-<video id="video" autoplay playsinline></video>
-<!-- We will use canvas as the preview; <img id="photo"> kept for compatibility but hidden -->
-<img id="photo" style="display:none">
-<canvas id="canvas" style="display:none"></canvas>
-<div id="processing">Processing…</div>
-
-<div id="menu-btn">☰</div>
-<div id="next-btn">↩ Next</div>
-<button id="save-btn" style="display:none">Save</button>
-<button id="shutter"></button>
-
-<!-- radial selector elements -->
-<div id="cameraRadialTrigger"></div>
-<div id="cameraRadialMenu"></div>
-
-<div id="controls">
-  <!-- NEW: UI Scale slider (live, persistent) -->
-  <label>UI Scale (<span id="ui-scale-val">0.85</span>x)
-    <input type="range" id="ui-scale" min="0.60" max="1.20" step="0.01" value="0.85">
-  </label>
-
-  <label>Film Simulation
-    <select id="film">
-      <option value="kodachrome">Kodachrome</option>
-      <option value="acros">Acros (Monochrome)</option>
-    </select>
-  </label>
-  <label>JPEG Compression (<span id="jpeg-quality-val">60</span>%)
-    <input type="range" id="jpeg-quality" min="20" max="100" value="60">
-  </label>
-  <label>Film Grain (<span id="grain-val">2</span>)
-    <input type="range" id="grain" min="0" max="50" value="19">
-  </label>
-
-  <!-- —— COLOR MIX (H/S/L) —— -->
-  <div class="divider"></div>
-  <div class="row">
-    <input type="checkbox" id="cm-enable">
-    <label for="cm-enable" style="margin:0">Enable Per-Color Adjustments</label>
-  </div>
-  <div id="cm-wrap" style="display:none">
-    <div class="row" id="cm-palette" aria-label="Color buckets"></div>
-    <div class="row small"><span id="cm-label">Red</span> &nbsp;|&nbsp; Hue <span id="cm-hv">0</span>° &nbsp; Sat <span id="cm-sv">0</span> &nbsp; Lum <span id="cm-lv">0</span></div>
-    <label>Hue Shift (°)
-      <input type="range" id="cm-h" min="-30" max="30" value="0">
-    </label>
-    <label>Saturation (-100…+100)
-      <input type="range" id="cm-s" min="-100" max="100" value="0">
-    </label>
-    <label>Luminance (-100…+100)
-      <input type="range" id="cm-l" min="-100" max="100" value="0">
-    </label>
-    <div class="row">
-      <button id="cm-reset" style="padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid #fff;border-radius:6px;color:#fff;cursor:pointer">Reset Color Mix</button>
-    </div>
-  </div>
-  <!-- —— /COLOR MIX —— -->
-
-  <!-- —— NEW: CALIBRATION ENTRY —— -->
-  <div class="divider"></div>
-  <button id="calibrate-btn" title="Capture a calibration shot, then fine-tune">Color Calibration</button>
-  <div id="hint" style="display:none;">Calibration armed: snap a photo to open calibration sliders.</div>
-
-  <!-- —— NEW: CALIBRATION PANEL —— -->
-  <div id="calibration-panel" style="display:none">
-    <div class="divider"></div>
-    <strong>Calibration</strong>
-    <label>White Balance – Red (-8…+8): <span id="wb-r-val">0</span>
-      <input type="range" id="wb-r" min="-8" max="8" value="0">
-    </label>
-    <label>White Balance – Blue (-8…+8): <span id="wb-b-val">0</span>
-      <input type="range" id="wb-b" min="-8" max="8" value="0">
-    </label>
-    <label>Vignette (0…100): <span id="vig-val">0</span>
-      <input type="range" id="vignette" min="0" max="100" value="0">
-    </label>
-    <div class="row">
-      <button id="save-profile-btn" title="Save current mix + WB + grain + vignette as a profile">Save as Film Profile</button>
-    </div>
-  </div>
-
-  <button id="menu-exit-btn">Exit Menu</button>
-  <button id="gallery-btn">View Gallery</button>
+<!-- Viewfinder -->
+<div id="viewfinder-container">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+  <img id="photo">
 </div>
 
-<button id="text-btn" style="display:none">TEXT</button>
-<div id="text-input-modal" style="display:none">
-  <input type="text" id="text-input" maxlength="50" placeholder="Enter text">
-  <button id="text-submit">OK</button>
-  <button id="text-cancel">Cancel</button>
+<!-- Top Bar -->
+<div id="top-bar">
+  <button id="camera-switch">📷</button>
+  <button id="gallery-btn">Gallery</button>
 </div>
+
+<!-- Bottom Controls -->
+<div id="bottom-controls">
+  <button id="menu-trigger">☰</button>
+  <button id="shutter"></button>
+  <button id="save-btn">💾</button>
+  <button id="next-btn">↩</button>
+  <button id="text-btn">T</button>
+</div>
+
+<!-- Bottom Sheet -->
+<div id="bottom-sheet">
+  <div id="sheet-handle"></div>
+  <div id="sheet-title">Film Controls</div>
+  
+  <div id="tabs">
+    <button class="tab active" data-tab="presets">Presets</button>
+    <button class="tab" data-tab="effects">Effects</button>
+    <button class="tab" data-tab="colors">Colors</button>
+  </div>
+  
+  <div id="tab-content">
+    <!-- PRESETS TAB -->
+    <div class="tab-panel active" id="presets-panel">
+      <div id="preset-grid">
+        <div class="preset-card active" data-preset="kodachrome">
+          <div class="preset-name">Kodachrome</div>
+          <div class="preset-desc">Classic warm</div>
+        </div>
+        <div class="preset-card" data-preset="acros">
+          <div class="preset-name">Acros</div>
+          <div class="preset-desc">B&W film</div>
+        </div>
+        <div class="preset-card" data-preset="velvia">
+          <div class="preset-name">Velvia</div>
+          <div class="preset-desc">Vibrant colors</div>
+        </div>
+        <div class="preset-card" data-preset="provia">
+          <div class="preset-name">Provia</div>
+          <div class="preset-desc">Natural tones</div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div id="custom-profiles"></div>
+      
+      <button class="btn-secondary" id="save-profile-btn">Save Current as Profile</button>
+    </div>
+    
+    <!-- EFFECTS TAB -->
+    <div class="tab-panel" id="effects-panel">
+      <div class="control-group">
+        <div class="control-label">
+          <span>Film Grain</span>
+          <span class="control-value" id="grain-val">0</span>
+        </div>
+        <input type="range" id="grain" min="0" max="50" value="0">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>JPEG Quality</span>
+          <span class="control-value" id="jpeg-quality-val">60%</span>
+        </div>
+        <input type="range" id="jpeg-quality" min="20" max="100" value="60">
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>White Balance - Red</span>
+          <span class="control-value" id="wb-r-val">0</span>
+        </div>
+        <input type="range" id="wb-r" min="-8" max="8" value="0">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>White Balance - Blue</span>
+          <span class="control-value" id="wb-b-val">0</span>
+        </div>
+        <input type="range" id="wb-b" min="-8" max="8" value="0">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>Vignette</span>
+          <span class="control-value" id="vig-val">0</span>
+        </div>
+        <input type="range" id="vignette" min="0" max="100" value="0">
+      </div>
+    </div>
+    
+    <!-- COLORS TAB -->
+    <div class="tab-panel" id="colors-panel">
+      <div class="toggle-section">
+        <input type="checkbox" id="cm-enable">
+        <label for="cm-enable">Enable Per-Color Adjustments</label>
+      </div>
+      
+      <div id="cm-wrapper" style="display:none">
+        <div class="color-palette" id="color-palette"></div>
+        
+        <div class="color-info" id="color-info">Select a color to adjust</div>
+        
+        <div class="control-group">
+          <div class="control-label">
+            <span>Hue Shift</span>
+            <span class="control-value" id="cm-h-val">0°</span>
+          </div>
+          <input type="range" id="cm-h" min="-30" max="30" value="0">
+        </div>
+        
+        <div class="control-group">
+          <div class="control-label">
+            <span>Saturation</span>
+            <span class="control-value" id="cm-s-val">0</span>
+          </div>
+          <input type="range" id="cm-s" min="-100" max="100" value="0">
+        </div>
+        
+        <div class="control-group">
+          <div class="control-label">
+            <span>Luminance</span>
+            <span class="control-value" id="cm-l-val">0</span>
+          </div>
+          <input type="range" id="cm-l" min="-100" max="100" value="0">
+        </div>
+        
+        <button class="btn-secondary" id="cm-reset">Reset All Colors</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Camera Selector -->
+<div id="camera-selector"></div>
+
+<!-- Text Modal -->
+<div id="text-modal">
+  <input type="text" id="text-input" maxlength="50" placeholder="Enter text for photo">
+  <div class="modal-buttons">
+    <button id="text-cancel" style="background: rgba(255,255,255,0.1); color: #fff;">Cancel</button>
+    <button id="text-submit" style="background: #007aff; color: #fff;">Add Text</button>
+  </div>
+</div>
+
+<!-- Gallery -->
+<div id="gallery-overlay">
+  <div id="gallery-header">
+    <h2 style="font-size: 20px; font-weight: 600;">Gallery</h2>
+    <button id="gallery-close" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 16px; border-radius: 20px;">Close</button>
+  </div>
+  <div id="gallery-content"></div>
+</div>
+
+<!-- Processing -->
+<div id="processing">
+  <div style="text-align: center;">
+    <div style="font-size: 18px; margin-bottom: 8px;">Processing...</div>
+    <div style="font-size: 14px; opacity: 0.7;">Applying film simulation</div>
+  </div>
+</div>
+
+<select id="cameraSelect" style="display:none"></select>
 
 <script>
-/* ---------- DOM refs & state ---------- */
-const video        = document.getElementById('video');
-const canvas       = document.getElementById('canvas');
-const photo        = document.getElementById('photo');   // kept for compatibility; preview uses canvas
+/* ========== DOM REFS ========== */
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const photo = document.getElementById('photo');
+const shutter = document.getElementById('shutter');
+const saveBtn = document.getElementById('save-btn');
+const nextBtn = document.getElementById('next-btn');
+const textBtn = document.getElementById('text-btn');
 const processingEl = document.getElementById('processing');
-const shutter      = document.getElementById('shutter');
-const saveBtn      = document.getElementById('save-btn');
-const nextBtn      = document.getElementById('next-btn');
-const menuBtn      = document.getElementById('menu-btn');
-const controls     = document.getElementById('controls');
-const grainSlider  = document.getElementById('grain');
-const grainVal     = document.getElementById('grain-val');
-const filmSelect   = document.getElementById('film');
 const cameraSelect = document.getElementById('cameraSelect');
-const jpegSlider   = document.getElementById('jpeg-quality');
-const jpegVal      = document.getElementById('jpeg-quality-val');
-const textBtn      = document.getElementById('text-btn');
-const textModal    = document.getElementById('text-input-modal');
-const textInput    = document.getElementById('text-input');
-const textSubmit   = document.getElementById('text-submit');
-const textCancel   = document.getElementById('text-cancel');
+const bottomSheet = document.getElementById('bottom-sheet');
+const menuTrigger = document.getElementById('menu-trigger');
+const sheetHandle = document.getElementById('sheet-handle');
 
-const calibrateBtn = document.getElementById('calibrate-btn');
-const calibrationPanel = document.getElementById('calibration-panel');
-const hintEl = document.getElementById('hint');
-const wbRSlider = document.getElementById('wb-r');
-const wbBSlider = document.getElementById('wb-b');
-const wbRVal = document.getElementById('wb-r-val');
-const wbBVal = document.getElementById('wb-b-val');
-const vignetteSlider = document.getElementById('vignette');
-const vigVal = document.getElementById('vig-val');
-const saveProfileBtn = document.getElementById('save-profile-btn');
-
-/* NEW: UI scale controls */
-const uiScaleSlider = document.getElementById('ui-scale');
-const uiScaleVal = document.getElementById('ui-scale-val');
-
-/* ----- radial selector refs ----- */
-const cameraRadialTrigger = document.getElementById('cameraRadialTrigger');
-const cameraRadialMenu    = document.getElementById('cameraRadialMenu');
-
-/* ----- Color Mix refs ----- */
-const cmEnable = document.getElementById('cm-enable');
-const cmWrap   = document.getElementById('cm-wrap');
-const cmPalette= document.getElementById('cm-palette');
-const cmH      = document.getElementById('cm-h');
-const cmS      = document.getElementById('cm-s');
-const cmL      = document.getElementById('cm-l');
-const cmHV     = document.getElementById('cm-hv');
-const cmSV     = document.getElementById('cm-sv');
-const cmLV     = document.getElementById('cm-lv');
-const cmLabel  = document.getElementById('cm-label');
-const cmReset  = document.getElementById('cm-reset');
-
-/* ---------- helpers ---------- */
-function lockScroll(){
-  document.documentElement.style.overflow = 'hidden';
-  document.body.style.overflow           = 'hidden';
-  window.scrollTo(0,0);
-}
-
-/* ---------- state ---------- */
-let stream   = null,
-    grainAmt = +grainSlider.value,
-    film     = filmSelect.value,
-    jpegQ    = +jpegSlider.value,
-    userText = '',
-    dim      = null,
-    lastFrameImageData = null; // processed pixels
-
-/* ---------- Calibration state ---------- */
-let calibrationArmed = false; // true after tapping "Color Calibration"
-let activeProfileName = null; // when selecting a saved profile
+/* ========== STATE ========== */
+let stream = null;
+let grainAmt = 0;
+let film = 'kodachrome';
+let jpegQ = 60;
+let userText = '';
+let dim = null;
+let lastFrameImageData = null;
+let activeProfileName = null;
 
 const PROFILE_KEY = 'filmProfilesV1';
-let profiles = {}; // name -> settings
+let profiles = {};
 
-/* ---------- COLOR MIX state ---------- */
-const CM_KEY = 'colorMixSettingsV1';
 const colors = [
-  {name:'Red',     css:'#ff3b30', center:0.00},
-  {name:'Orange',  css:'#ff9500', center:0.06},
-  {name:'Yellow',  css:'#ffcc00', center:0.12},
-  {name:'Green',   css:'#34c759', center:0.33},
-  {name:'Aqua',    css:'#32d7d7', center:0.50},
-  {name:'Blue',    css:'#007aff', center:0.62},
-  {name:'Purple',  css:'#9b59ff', center:0.75},
+  {name:'Red', css:'#ff3b30', center:0.00},
+  {name:'Orange', css:'#ff9500', center:0.06},
+  {name:'Yellow', css:'#ffcc00', center:0.12},
+  {name:'Green', css:'#34c759', center:0.33},
+  {name:'Aqua', css:'#32d7d7', center:0.50},
+  {name:'Blue', css:'#007aff', center:0.62},
+  {name:'Purple', css:'#9b59ff', center:0.75},
   {name:'Magenta', css:'#ff2d7a', center:0.88},
 ];
 const hueWidth = [0.09,0.10,0.08,0.07,0.06,0.07,0.07,0.08];
 let cmIdx = 0;
 
+const CM_KEY = 'colorMixSettingsV1';
 let cmState = { enable:false, dH:new Array(8).fill(0), dS:new Array(8).fill(0), dL:new Array(8).fill(0) };
-try{
-  const saved = JSON.parse(localStorage.getItem(CM_KEY));
-  if (saved && Array.isArray(saved.dH) && Array.isArray(saved.dS) && Array.isArray(saved.dL)){
-    cmState = { enable: !!saved.enable, dH: saved.dH, dS: saved.dS, dL: saved.dL };
-  }
-}catch{}
 
-/* ---------- NEW: WB/Vignette state ---------- */
 const WB_KEY = 'wbSettingsV1';
-let wb = { r:0, b:0 }; // -8..+8 each
-let vignetteAmt = 0;   // 0..100
-try{
+let wb = { r:0, b:0 };
+let vignetteAmt = 0;
+
+/* ========== LOAD SAVED SETTINGS ========== */
+try {
+  const saved = JSON.parse(localStorage.getItem(CM_KEY));
+  if (saved && Array.isArray(saved.dH)) cmState = saved;
+} catch {}
+
+try {
   const savedWB = JSON.parse(localStorage.getItem(WB_KEY));
-  if (savedWB && typeof savedWB.r === 'number' && typeof savedWB.b === 'number') wb = savedWB;
-}catch{}
-try{
+  if (savedWB) wb = savedWB;
+} catch {}
+
+try {
   const savedVig = +localStorage.getItem('vignetteAmtV1');
   if (!isNaN(savedVig)) vignetteAmt = savedVig;
-}catch{}
+} catch {}
 
-/* ---------- NEW: UI scale persistence ---------- */
-const UI_KEY = 'uiScaleV1';
-(function initUiScale(){
-  let s = parseFloat(localStorage.getItem(UI_KEY));
-  if (!(s > 0)) s = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 0.85;
-  document.documentElement.style.setProperty('--ui-scale', String(s));
-  if (uiScaleSlider){
-    uiScaleSlider.value = String(s.toFixed(2));
-    uiScaleVal.textContent = String(s.toFixed(2));
-    uiScaleSlider.addEventListener('input', () => {
-      const v = parseFloat(uiScaleSlider.value);
-      document.documentElement.style.setProperty('--ui-scale', String(v));
-      uiScaleVal.textContent = String(v.toFixed(2));
-      localStorage.setItem(UI_KEY, String(v));
-    });
+/* ========== TABS ========== */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab + '-panel').classList.add('active');
+  });
+});
+
+/* ========== BOTTOM SHEET INTERACTION ========== */
+let sheetExpanded = false;
+let touchStartY = 0;
+let sheetStartY = 0;
+
+menuTrigger.addEventListener('click', () => {
+  sheetExpanded = !sheetExpanded;
+  bottomSheet.classList.toggle('expanded', sheetExpanded);
+});
+
+sheetHandle.addEventListener('touchstart', (e) => {
+  touchStartY = e.touches[0].clientY;
+  sheetStartY = bottomSheet.getBoundingClientRect().top;
+}, { passive: true });
+
+sheetHandle.addEventListener('touchmove', (e) => {
+  const deltaY = e.touches[0].clientY - touchStartY;
+  if (deltaY > 0 && sheetExpanded) {
+    bottomSheet.style.transform = `translateY(${deltaY}px)`;
   }
-})();
+}, { passive: true });
 
-/* ---------- sliders & simple UI ---------- */
-grainSlider.oninput = () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; };
-filmSelect.onchange = () => {
-  const v = filmSelect.value;
-  if (v.startsWith('profile:')){
-    activeProfileName = v.slice(8);
-    applyProfileToUI(activeProfileName);
-  }else{
+sheetHandle.addEventListener('touchend', (e) => {
+  const deltaY = e.changedTouches[0].clientY - touchStartY;
+  bottomSheet.style.transform = '';
+  if (deltaY > 100) {
+    sheetExpanded = false;
+    bottomSheet.classList.remove('expanded');
+  }
+});
+
+/* ========== PRESETS ========== */
+document.querySelectorAll('.preset-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    film = card.dataset.preset;
     activeProfileName = null;
-    film = v;
-  }
-};
-jpegSlider.oninput  = () => { jpegQ  = +jpegSlider.value; jpegVal.textContent = jpegQ; };
-menuBtn.onclick     = () => controls.classList.toggle('show');
+    if (lastFrameImageData) shootReprocess();
+  });
+});
 
-/* ---------- Color Mix UI build ---------- */
-function buildPalette(){
-  cmPalette.innerHTML = '';
+/* ========== SLIDERS ========== */
+const grainSlider = document.getElementById('grain');
+const grainVal = document.getElementById('grain-val');
+grainSlider.addEventListener('input', () => {
+  grainAmt = +grainSlider.value;
+  grainVal.textContent = grainAmt;
+  if (lastFrameImageData) shootReprocess();
+});
+
+const jpegSlider = document.getElementById('jpeg-quality');
+const jpegVal = document.getElementById('jpeg-quality-val');
+jpegSlider.addEventListener('input', () => {
+  jpegQ = +jpegSlider.value;
+  jpegVal.textContent = jpegQ + '%';
+});
+
+const wbRSlider = document.getElementById('wb-r');
+const wbRVal = document.getElementById('wb-r-val');
+wbRSlider.addEventListener('input', () => {
+  wb.r = +wbRSlider.value;
+  wbRVal.textContent = wb.r;
+  localStorage.setItem(WB_KEY, JSON.stringify(wb));
+  if (lastFrameImageData) shootReprocess();
+});
+
+const wbBSlider = document.getElementById('wb-b');
+const wbBVal = document.getElementById('wb-b-val');
+wbBSlider.addEventListener('input', () => {
+  wb.b = +wbBSlider.value;
+  wbBVal.textContent = wb.b;
+  localStorage.setItem(WB_KEY, JSON.stringify(wb));
+  if (lastFrameImageData) shootReprocess();
+});
+
+const vignetteSlider = document.getElementById('vignette');
+const vigVal = document.getElementById('vig-val');
+vignetteSlider.addEventListener('input', () => {
+  vignetteAmt = +vignetteSlider.value;
+  vigVal.textContent = vignetteAmt;
+  localStorage.setItem('vignetteAmtV1', String(vignetteAmt));
+  if (lastFrameImageData) shootReprocess();
+});
+
+// Initialize slider displays
+wbRVal.textContent = wb.r;
+wbBVal.textContent = wb.b;
+vigVal.textContent = vignetteAmt;
+wbRSlider.value = wb.r;
+wbBSlider.value = wb.b;
+vignetteSlider.value = vignetteAmt;
+
+/* ========== COLOR MIX ========== */
+const cmEnable = document.getElementById('cm-enable');
+const cmWrapper = document.getElementById('cm-wrapper');
+const colorPalette = document.getElementById('color-palette');
+const colorInfo = document.getElementById('color-info');
+const cmH = document.getElementById('cm-h');
+const cmS = document.getElementById('cm-s');
+const cmL = document.getElementById('cm-l');
+const cmHVal = document.getElementById('cm-h-val');
+const cmSVal = document.getElementById('cm-s-val');
+const cmLVal = document.getElementById('cm-l-val');
+const cmReset = document.getElementById('cm-reset');
+
+function buildColorPalette() {
+  colorPalette.innerHTML = '';
   colors.forEach((c, i) => {
     const chip = document.createElement('div');
-    chip.className = 'chip' + (i===cmIdx ? ' sel':'');
+    chip.className = 'color-chip' + (i === cmIdx ? ' selected' : '');
     chip.style.background = c.css;
-    chip.title = c.name;
-    chip.addEventListener('click', () => { cmIdx = i; refreshCmControls(); buildPalette(); });
-    cmPalette.appendChild(chip);
-  });
-}
-function refreshCmControls(){
-  cmEnable.checked = cmState.enable;
-  cmWrap.style.display = cmState.enable ? 'block' : 'none';
-  cmLabel.textContent = colors[cmIdx].name;
-  cmH.value = Math.round((cmState.dH[cmIdx] || 0) * 360);
-  cmS.value = Math.round((cmState.dS[cmIdx] || 0) * 200);
-  cmL.value = Math.round((cmState.dL[cmIdx] || 0) * 200);
-  cmHV.textContent = cmH.value;
-  cmSV.textContent = cmS.value;
-  cmLV.textContent = cmL.value;
-}
-function saveCmState(){ localStorage.setItem(CM_KEY, JSON.stringify(cmState)); }
-cmEnable.addEventListener('change', () => { cmState.enable = cmEnable.checked; saveCmState(); refreshCmControls(); });
-cmH.addEventListener('input', () => { cmState.dH[cmIdx] = (+cmH.value)/360; cmHV.textContent = cmH.value; saveCmState(); });
-cmS.addEventListener('input', () => { cmState.dS[cmIdx] = (+cmS.value)/200; cmSV.textContent = cmS.value; saveCmState(); });
-cmL.addEventListener('input', () => { cmState.dL[cmIdx] = (+cmL.value)/200; cmLV.textContent = cmL.value; saveCmState(); });
-cmReset.addEventListener('click', () => { cmState.dH.fill(0); cmState.dS.fill(0); cmState.dL.fill(0); saveCmState(); refreshCmControls(); });
-buildPalette(); refreshCmControls();
-
-/* ---------- NEW: Calibration UI wiring ---------- */
-function refreshWBUI(){
-  wbRSlider.value = wb.r; wbBSlider.value = wb.b;
-  wbRVal.textContent = wb.r; wbBVal.textContent = wb.b;
-}
-function refreshVignetteUI(){
-  vignetteSlider.value = vignetteAmt;
-  vigVal.textContent = vignetteAmt;
-}
-function saveWB(){ localStorage.setItem(WB_KEY, JSON.stringify(wb)); }
-function saveVignette(){ localStorage.setItem('vignetteAmtV1', String(vignetteAmt)); }
-
-wbRSlider.oninput = () => { wb.r = +wbRSlider.value; wbRVal.textContent = wb.r; saveWB(); if (lastFrameImageData) shootReprocess(); };
-wbBSlider.oninput = () => { wb.b = +wbBSlider.value; wbBVal.textContent = wb.b; saveWB(); if (lastFrameImageData) shootReprocess(); };
-vignetteSlider.oninput = () => { vignetteAmt = +vignetteSlider.value; vigVal.textContent = vignetteAmt; saveVignette(); if (lastFrameImageData) shootReprocess(); };
-
-calibrateBtn.onclick = () => {
-  calibrationArmed = true;
-  hintEl.style.display = 'block';
-  controls.classList.remove('show');
-  // ensure color mix visible during calibration
-  cmState.enable = true; saveCmState(); refreshCmControls();
-};
-
-function openCalibrationPanel(){
-  controls.classList.add('show');
-  calibrationPanel.style.display = 'block';
-  refreshWBUI(); refreshVignetteUI();
-}
-
-saveProfileBtn.onclick = () => {
-  const name = (prompt('Profile name?') || '').trim();
-  if (!name) return;
-  const settings = {
-    filmBase: filmSelect.value.startsWith('profile:') ? 'kodachrome' : filmSelect.value,
-    cmState,
-    grainAmt,
-    wb,
-    vignetteAmt
-  };
-  profiles[name] = settings;
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
-  populateProfiles();
-  // auto-select it
-  filmSelect.value = 'profile:' + name;
-  activeProfileName = name;
-  alert('Saved profile: ' + name);
-};
-
-/* ---------- Profiles load/apply ---------- */
-function populateProfiles(){
-  // ensure an optgroup exists
-  let group = filmSelect.querySelector('optgroup[label="Custom Profiles"]');
-  if (!group){
-    group = document.createElement('optgroup');
-    group.label = 'Custom Profiles';
-    filmSelect.appendChild(group);
-  }
-  group.innerHTML = '';
-  Object.keys(profiles).forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = 'profile:' + name;
-    opt.textContent = 'Profile: ' + name;
-    group.appendChild(opt);
+    chip.addEventListener('click', () => {
+      cmIdx = i;
+      buildColorPalette();
+      updateColorControls();
+    });
+    colorPalette.appendChild(chip);
   });
 }
 
-function loadProfiles(){
-  try{
+function updateColorControls() {
+  colorInfo.textContent = `${colors[cmIdx].name} • Hue ${Math.round(cmState.dH[cmIdx]*360)}° • Sat ${Math.round(cmState.dS[cmIdx]*200)} • Lum ${Math.round(cmState.dL[cmIdx]*200)}`;
+  cmH.value = Math.round(cmState.dH[cmIdx] * 360);
+  cmS.value = Math.round(cmState.dS[cmIdx] * 200);
+  cmL.value = Math.round(cmState.dL[cmIdx] * 200);
+  cmHVal.textContent = cmH.value + '°';
+  cmSVal.textContent = cmS.value;
+  cmLVal.textContent = cmL.value;
+}
+
+cmEnable.addEventListener('change', () => {
+  cmState.enable = cmEnable.checked;
+  cmWrapper.style.display = cmState.enable ? 'block' : 'none';
+  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
+  if (lastFrameImageData) shootReprocess();
+});
+
+cmH.addEventListener('input', () => {
+  cmState.dH[cmIdx] = (+cmH.value) / 360;
+  cmHVal.textContent = cmH.value + '°';
+  updateColorControls();
+  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
+  if (lastFrameImageData) shootReprocess();
+});
+
+cmS.addEventListener('input', () => {
+  cmState.dS[cmIdx] = (+cmS.value) / 200;
+  cmSVal.textContent = cmS.value;
+  updateColorControls();
+  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
+  if (lastFrameImageData) shootReprocess();
+});
+
+cmL.addEventListener('input', () => {
+  cmState.dL[cmIdx] = (+cmL.value) / 200;
+  cmLVal.textContent = cmL.value;
+  updateColorControls();
+  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
+  if (lastFrameImageData) shootReprocess();
+});
+
+cmReset.addEventListener('click', () => {
+  cmState.dH.fill(0);
+  cmState.dS.fill(0);
+  cmState.dL.fill(0);
+  updateColorControls();
+  buildColorPalette();
+  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
+  if (lastFrameImageData) shootReprocess();
+});
+
+cmEnable.checked = cmState.enable;
+cmWrapper.style.display = cmState.enable ? 'block' : 'none';
+buildColorPalette();
+updateColorControls();
+
+/* ========== PROFILES ========== */
+function loadProfiles() {
+  try {
     const raw = JSON.parse(localStorage.getItem(PROFILE_KEY));
-    if (raw && typeof raw === 'object') profiles = raw;
-  }catch{}
-  populateProfiles();
+    if (raw) profiles = raw;
+  } catch {}
+  renderProfiles();
 }
 
-function applyProfileToUI(name){
+function renderProfiles() {
+  const container = document.getElementById('custom-profiles');
+  container.innerHTML = '';
+  
+  Object.keys(profiles).forEach(name => {
+    const card = document.createElement('div');
+    card.className = 'preset-card';
+    card.innerHTML = `
+      <div class="preset-name">${name}</div>
+      <div class="preset-desc">Custom profile</div>
+    `;
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      activeProfileName = name;
+      applyProfile(name);
+    });
+    container.appendChild(card);
+  });
+}
+
+function applyProfile(name) {
   const p = profiles[name];
   if (!p) return;
-  // Set base film but keep select on profile
+  
   film = p.filmBase || 'kodachrome';
-  grainAmt = typeof p.grainAmt === 'number' ? p.grainAmt : grainAmt;
-  grainSlider.value = grainAmt; grainVal.textContent = grainAmt;
-
-  if (p.cmState){
+  grainAmt = p.grainAmt || 19;
+  grainSlider.value = grainAmt;
+  grainVal.textContent = grainAmt;
+  
+  if (p.cmState) {
     cmState = JSON.parse(JSON.stringify(p.cmState));
-    saveCmState();
-    refreshCmControls();
-    buildPalette();
+    cmEnable.checked = cmState.enable;
+    cmWrapper.style.display = cmState.enable ? 'block' : 'none';
+    updateColorControls();
+    buildColorPalette();
+    localStorage.setItem(CM_KEY, JSON.stringify(cmState));
   }
-  if (p.wb){
-    wb = { r: p.wb.r|0, b: p.wb.b|0 };
-    saveWB(); refreshWBUI();
+  
+  if (p.wb) {
+    wb = { r: p.wb.r || 0, b: p.wb.b || 0 };
+    wbRSlider.value = wb.r;
+    wbBSlider.value = wb.b;
+    wbRVal.textContent = wb.r;
+    wbBVal.textContent = wb.b;
+    localStorage.setItem(WB_KEY, JSON.stringify(wb));
   }
-  if (typeof p.vignetteAmt === 'number'){
-    vignetteAmt = p.vignetteAmt|0;
-    saveVignette(); refreshVignetteUI();
+  
+  if (typeof p.vignetteAmt === 'number') {
+    vignetteAmt = p.vignetteAmt;
+    vignetteSlider.value = vignetteAmt;
+    vigVal.textContent = vignetteAmt;
+    localStorage.setItem('vignetteAmtV1', String(vignetteAmt));
   }
-  // reprocess if a frame exists
+  
   if (lastFrameImageData) shootReprocess();
 }
 
-/* ---------- NEXT / MENU ---------- */
-nextBtn.onclick = () => {
-  document.documentElement.style.overflow = 'hidden';
-  document.body.style.position  = 'fixed';
-  document.body.style.width     = '100%';
-  window.scrollTo(0, 0);
-  lockScroll();
-  video.style.display   = 'block';
-  canvas.style.display  = 'none';
-  photo.style.display   = 'none';
-  nextBtn.style.display = 'none';
-  textBtn.style.display = 'none';
-  saveBtn.style.display = 'none';
-  lastFrameImageData = null;
-  dim = null;
-  userText = '';
-  hintEl.style.display = 'none';
-  calibrationPanel.style.display = 'none';
-  calibrationArmed = false;
-};
+document.getElementById('save-profile-btn').addEventListener('click', () => {
+  const name = prompt('Profile name?');
+  if (!name) return;
+  
+  profiles[name] = {
+    filmBase: film,
+    grainAmt,
+    cmState: JSON.parse(JSON.stringify(cmState)),
+    wb: { ...wb },
+    vignetteAmt
+  };
+  
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
+  renderProfiles();
+  alert('Profile saved: ' + name);
+});
 
-/* ---------- camera core ---------- */
-cameraSelect.onchange = () => bootCam(cameraSelect.value);
-
-// OPTIMIZATION: request ~1080p instead of 4K to reduce pixel work
-async function bootCam(id = null){
+/* ========== CAMERA ========== */
+async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
-  const c = { video: id
-                ? { deviceId:{exact:id}, width:{ideal:1920}, height:{ideal:1080} }
-                : { facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} } };
-  try{
+  const c = { 
+    video: id 
+      ? { deviceId: {exact: id}, width: {ideal: 1920}, height: {ideal: 1080} }
+      : { facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080} }
+  };
+  
+  try {
     stream = await navigator.mediaDevices.getUserMedia(c);
     video.srcObject = stream;
     await video.play();
-    await cams();
-  }catch(e){
+    await updateCameraList();
+  } catch (e) {
     alert('Camera error: ' + e.message);
   }
 }
 
-async function cams(){
-  const v = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-  const current = cameraSelect.value;
+async function updateCameraList() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cameras = devices.filter(d => d.kind === 'videoinput');
+  
   cameraSelect.innerHTML = '';
-  v.forEach((d,i) => {
-    const o = document.createElement('option');
-    o.value = d.deviceId;
-    o.textContent = d.label || `Camera ${i+1}`;
-    cameraSelect.appendChild(o);
+  cameras.forEach((d, i) => {
+    const opt = document.createElement('option');
+    opt.value = d.deviceId;
+    opt.textContent = d.label || `Camera ${i+1}`;
+    cameraSelect.appendChild(opt);
   });
-  if (current) cameraSelect.value = current;
 }
 
-/* ---------- radial-selector logic ---------- */
-let radialTimeout = null;
-let radialActive  = false;
-let currentHoveredOpt = null;
-
-cameraRadialTrigger.addEventListener('pointerdown', () => {
-  radialTimeout = setTimeout(() => { showCameraRadialMenu(); radialActive = true; }, 300);
-});
-
-document.addEventListener('pointermove', e => {
-  if (!radialActive) return;
-  const opts = document.querySelectorAll('.camera-option');
-  let closest = null, minDist = Infinity;
-  opts.forEach(opt => {
-    const r  = opt.getBoundingClientRect();
-    const cx = r.left + r.width/2, cy = r.top + r.height/2;
-    const dx = e.clientX - cx, dy = e.clientY - cy;
-    const d = Math.hypot(dx, dy);
-    if (d < minDist && d < 120) { minDist = d; closest = opt; }
-    opt.style.background = 'rgba(255,255,255,0.15)';
-  });
-  currentHoveredOpt = closest;
-  if (closest) closest.style.background = 'rgba(255,255,255,0.4)';
-});
-
-document.addEventListener('pointerup', () => {
-  clearTimeout(radialTimeout);
-  if (radialActive){
-    if (currentHoveredOpt){
-      const id = currentHoveredOpt.getAttribute('data-device-id');
-      cameraSelect.value = id;
-      bootCam(id);
-    }
-    cameraRadialMenu.innerHTML = '';
-    radialActive = false;
-    currentHoveredOpt = null;
+document.getElementById('camera-switch').addEventListener('click', () => {
+  const selector = document.getElementById('camera-selector');
+  if (selector.style.display === 'flex') {
+    selector.style.display = 'none';
+    return;
   }
-});
-
-function showCameraRadialMenu(){
-  cameraRadialMenu.innerHTML = '';
-  const opts    = Array.from(cameraSelect.options);
-  const count   = opts.length;
-  const showCnt = Math.max(1, Math.min(7, count));
-  const startA  = -Math.PI/4, endA = Math.PI/4, spread = endA - startA;
-  const radius  = 90 + (showCnt - 1) * 6;
-
-  opts.forEach((o, idx) => {
-    const ang = startA + idx * (spread / (showCnt - 1 || 1));
-    const x   = Math.cos(ang) * radius + 100;
-    const y   = Math.sin(ang) * radius + 100;
+  
+  selector.innerHTML = '';
+  Array.from(cameraSelect.options).forEach(opt => {
     const btn = document.createElement('div');
     btn.className = 'camera-option';
-    btn.style.left  = `${x}px`; btn.style.top = `${y}px`;
-    btn.textContent = o.textContent;
-    btn.setAttribute('data-device-id', o.value);
-    btn.addEventListener('pointerup', e => {
-      e.stopPropagation();
-      cameraSelect.value = btn.dataset.deviceId;
-      bootCam(btn.dataset.deviceId);
-      cameraRadialMenu.innerHTML = '';
-      radialActive = false;
+    btn.textContent = opt.textContent;
+    btn.addEventListener('click', () => {
+      bootCam(opt.value);
+      selector.style.display = 'none';
     });
-    cameraRadialMenu.appendChild(btn);
+    selector.appendChild(btn);
   });
-}
+  selector.style.display = 'flex';
+});
 
-/* ---------- text modal ---------- */
-function showModal(){ textModal.style.display='flex'; textInput.focus(); }
-function hideModal(){ textModal.style.display='none'; textInput.value=''; lockScroll(); }
-textBtn.onclick     = showModal;
-textCancel.onclick  = hideModal;
-textSubmit.onclick  = () => { userText = textInput.value.trim(); userText && (lastFrameImageData ? updateTxt() : shoot()); hideModal(); };
-textInput.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); textSubmit.click(); }});
-
-/* ---------- Worker (inline via Blob) ---------- */
+/* ========== WORKER ========== */
 const workerSrc = `
 self.onmessage = (e) => {
   const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt } = e.data;
@@ -617,14 +1152,15 @@ self.onmessage = (e) => {
     const M = Math.max(r,g,b), m = Math.min(r,g,b), delt = M - m;
     let h = 0;
     if (delt > 1e-6){
-      if (M === r)      h = ((g - b) / delt) % 6;
+      if (M === r) h = ((g - b) / delt) % 6;
       else if (M === g) h = (b - r) / delt + 2;
-      else              h = (r - g) / delt + 4;
+      else h = (r - g) / delt + 4;
       h /= 6; if (h<0) h+=1;
     }
     const s = M <= 1e-6 ? 0 : delt / M;
     return [h, s, M];
   }
+  
   function hsvToRgb(h,s,v){
     h = (h%1+1)%1;
     const x = h*6, i = Math.floor(x), f = x - i;
@@ -635,11 +1171,12 @@ self.onmessage = (e) => {
     else if (i===2){ r=p; g=v; b=t; }
     else if (i===3){ r=p; g=q; b=v; }
     else if (i===4){ r=t; g=p; b=v; }
-    else           { r=v; g=p; b=q; }
+    else { r=v; g=p; b=q; }
     return [Math.max(0,Math.min(255,Math.round(r*255))),
             Math.max(0,Math.min(255,Math.round(g*255))),
             Math.max(0,Math.min(255,Math.round(b*255)))];
   }
+  
   function hueDelta(a,b){ const d = Math.abs(a-b); return Math.min(d, 1 - d); }
   function bucketWeight(h, s, center, halfWidth){
     const dh = hueDelta(h, center);
@@ -650,23 +1187,19 @@ self.onmessage = (e) => {
     return wHue * gate;
   }
 
-  // Simple LFSR noise for speed (fewer Math.random calls)
   let seed = 1234567;
   function fastNoise(){
     seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
-    // map to [-1,1]
     return ((seed>>>0) / 0x7fffffff) * 2 - 1;
   }
 
-  // White balance gains from UI steps (-8..+8). Each step ~6% gain.
   const gainR = 1 + (wb.r || 0) * 0.06;
   const gainB = 1 + (wb.b || 0) * 0.06;
 
-  // Vignette setup
   const W = imageData.width, H = imageData.height;
   const cx = W * 0.5, cy = H * 0.5;
   const maxR = Math.min(W, H) * 0.5;
-  const vigPower = (vignetteAmt||0) / 100; // 0..1
+  const vigPower = (vignetteAmt||0) / 100;
 
   for (let y=0; y<H; y++){
     for (let x=0; x<W; x++){
@@ -674,10 +1207,13 @@ self.onmessage = (e) => {
       let r = d[i], g = d[i+1], bl = d[i+2];
 
       if (film === 'acros'){
-        const a = (r+g+bl)/3; r=g=bl=a;
-      }else{
         const a = (r+g+bl)/3;
-        r = r*.85 + a*.15; g = g*.85 + a*.15; bl = bl*.85 + a*.15;
+        r=g=bl=a;
+      } else {
+        const a = (r+g+bl)/3;
+        r = r*.85 + a*.15;
+        g = g*.85 + a*.15;
+        bl = bl*.85 + a*.15;
       }
 
       if (useColorMix){
@@ -700,26 +1236,39 @@ self.onmessage = (e) => {
         }
       }
 
-      // White balance (channel gains)
       r = r * gainR;
       bl = bl * gainB;
 
-      // Grain
-      if (grainAmt){
-        const n = fastNoise() * grainAmt;
-        r += n; g += n; bl += n;
+      if (grainAmt > 0){
+        // Exponential scaling for more subtle low-end control
+        // grainAmt 0-50 maps to actualIntensity 0-20 with exponential curve
+        const normalizedGrain = grainAmt / 50; // 0 to 1
+        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 20;
+        
+        // Generate grain for each channel with slight variation
+        const baseNoise = fastNoise();
+        const rNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
+        const gNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
+        const bNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
+        
+        // Apply grain with luminance-dependent intensity (more visible in midtones)
+        const lum = (r + g + bl) / 3;
+        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.6; // Peaks at midtones
+        
+        r += rNoise * lumFactor;
+        g += gNoise * lumFactor;
+        bl += bNoise * lumFactor;
       }
 
-      // Vignette (quadratic falloff)
       if (vigPower > 0){
         const dx = x - cx, dy = y - cy;
-        const rr = Math.sqrt(dx*dx + dy*dy) / maxR; // 0..~1.4
+        const rr = Math.sqrt(dx*dx + dy*dy) / maxR;
         const fall = Math.min(1, Math.max(0, rr));
         const vFactor = 1 - vigPower * (fall*fall);
         r *= vFactor; g *= vFactor; bl *= vFactor;
       }
 
-      d[i]   = r < 0 ? 0 : r > 255 ? 255 : r;
+      d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
       d[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
       d[i+2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
     }
@@ -728,211 +1277,228 @@ self.onmessage = (e) => {
   self.postMessage({ imageData }, [imageData.data.buffer]);
 };
 `;
-const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], {type:'application/javascript'})));
+const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], {type: 'application/javascript'})));
 
-/* ---------- shoot (instant preview + background processing) ---------- */
-shutter.onclick = () => { userText=''; shoot(); };
+/* ========== SHOOT ========== */
+shutter.addEventListener('click', () => {
+  userText = '';
+  shoot();
+});
 
-async function shoot(){
-  if (!video.videoWidth){ alert('Wait for camera'); return; }
+async function shoot() {
+  if (!video.videoWidth) {
+    alert('Wait for camera');
+    return;
+  }
 
-  const w   = video.videoWidth,
-        h   = video.videoHeight,
-        b   = Math.floor(Math.min(w,h) * 0.09),
-        fw  = w + b*2,
-        bot = b*2,
-        fh  = h + b + bot;
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  const b = Math.floor(Math.min(w, h) * 0.09);
+  const fw = w + b * 2;
+  const bot = b * 2;
+  const fh = h + b + bot;
 
-  canvas.width  = fw;
+  canvas.width = fw;
   canvas.height = fh;
-  dim           = {fw, fh, b, bot};
+  dim = { fw, fh, b, bot };
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  // 1) Draw white mat + raw frame immediately (instant preview)
   ctx.fillStyle = '#fff';
-  ctx.fillRect(0,0,fw,fh);
+  ctx.fillRect(0, 0, fw, fh);
   ctx.drawImage(video, b, b, w, h);
 
-  // 2) Swap UI to preview instantly (no toDataURL here)
   canvas.style.display = 'block';
-  video.style.display  = 'none';
-  photo.style.display  = 'none';
-  nextBtn.style.display = 'block';
-  textBtn.style.display = 'block';
-  saveBtn.style.display = 'block';
-  lockScroll();
+  video.style.display = 'none';
+  nextBtn.style.display = 'flex';
+  textBtn.style.display = 'flex';
+  saveBtn.style.display = 'flex';
+  
+  // Close bottom sheet when taking photo
+  sheetExpanded = false;
+  bottomSheet.classList.remove('expanded');
 
-  // 3) Kick off processing in a worker
-  const roi = ctx.getImageData(b,b,w,h);
+  const roi = ctx.getImageData(b, b, w, h);
   processingEl.style.display = 'flex';
-  const effective = getEffectiveSettings();
+
   worker.postMessage({
     imageData: roi,
-    film: effective.filmBase,
-    grainAmt: effective.grainAmt,
-    cmState: effective.cmState,
-    colors,
-    hueWidth,
-    wb: effective.wb,
-    vignetteAmt: effective.vignetteAmt
-  }, [roi.data.buffer]);
-
-  worker.onmessage = (e) => {
-    const { imageData } = e.data;
-    // put processed pixels back
-    ctx.putImageData(imageData, b, b);
-    lastFrameImageData = ctx.getImageData(0,0,fw,fh); // for text overlay update
-    drawTxt(ctx);
-    processingEl.style.display = 'none';
-
-    // If calibration was armed, open the panel after this shot
-    if (calibrationArmed){
-      controls.classList.add('show');
-      calibrationPanel.style.display = 'block';
-      hintEl.style.display = 'none';
-      calibrationArmed = false;
-    }
-  };
-}
-
-/* ---------- reprocess current frame with new settings (no new capture) ---------- */
-function shootReprocess(){
-  if (!dim) return;
-  const {fw, fh, b} = dim;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const roi = ctx.getImageData(b,b, canvas.width - b*2, canvas.height - b*2 - (dim.bot - b));
-  processingEl.style.display = 'flex';
-  const effective = getEffectiveSettings();
-  worker.postMessage({
-    imageData: roi,
-    film: effective.filmBase,
-    grainAmt: effective.grainAmt,
-    cmState: effective.cmState,
-    colors,
-    hueWidth,
-    wb: effective.wb,
-    vignetteAmt: effective.vignetteAmt
-  }, [roi.data.buffer]);
-  worker.onmessage = (e) => {
-    const { imageData } = e.data;
-    ctx.putImageData(imageData, b, b);
-    lastFrameImageData = ctx.getImageData(0,0,fw,fh);
-    drawTxt(ctx);
-    processingEl.style.display = 'none';
-  };
-}
-
-/* ---------- resolve settings (handles profiles) ---------- */
-function getEffectiveSettings(){
-  if (activeProfileName && profiles[activeProfileName]){
-    const p = profiles[activeProfileName];
-    return {
-      filmBase: p.filmBase || 'kodachrome',
-      grainAmt: p.grainAmt,
-      cmState : p.cmState || cmState,
-      wb      : p.wb || wb,
-      vignetteAmt: typeof p.vignetteAmt === 'number' ? p.vignetteAmt : 0
-    };
-  }
-  return {
-    filmBase: film,
+    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
     grainAmt,
     cmState,
+    colors,
+    hueWidth,
     wb,
     vignetteAmt
+  }, [roi.data.buffer]);
+
+  worker.onmessage = (e) => {
+    const { imageData } = e.data;
+    ctx.putImageData(imageData, b, b);
+    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
+    drawText(ctx);
+    processingEl.style.display = 'none';
   };
 }
 
-/* ---------- update text on processed frame ---------- */
-function updateTxt(){
-  if (!dim){ return; }
-  const {fw, fh, b, bot} = dim;
-  const ctx = canvas.getContext('2d');
-  if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
-  drawTxt(ctx);
+function shootReprocess() {
+  if (!dim) return;
+  const { fw, fh, b, bot } = dim;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const roi = ctx.getImageData(b, b, canvas.width - b * 2, canvas.height - b * 2 - (bot - b));
+  
+  processingEl.style.display = 'flex';
+
+  worker.postMessage({
+    imageData: roi,
+    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
+    grainAmt,
+    cmState,
+    colors,
+    hueWidth,
+    wb,
+    vignetteAmt
+  }, [roi.data.buffer]);
+
+  worker.onmessage = (e) => {
+    const { imageData } = e.data;
+    ctx.putImageData(imageData, b, b);
+    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
+    drawText(ctx);
+    processingEl.style.display = 'none';
+  };
 }
 
-/* ---------- text rendering ---------- */
-function drawTxt(ctx){
+/* ========== TEXT ========== */
+const textModal = document.getElementById('text-modal');
+const textInput = document.getElementById('text-input');
+
+textBtn.addEventListener('click', () => {
+  textModal.style.display = 'flex';
+  textInput.focus();
+});
+
+document.getElementById('text-cancel').addEventListener('click', () => {
+  textModal.style.display = 'none';
+  textInput.value = '';
+});
+
+document.getElementById('text-submit').addEventListener('click', () => {
+  userText = textInput.value.trim();
+  if (userText) {
+    updateText();
+  }
+  textModal.style.display = 'none';
+  textInput.value = '';
+});
+
+function updateText() {
+  if (!dim) return;
+  const ctx = canvas.getContext('2d');
+  if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
+  drawText(ctx);
+}
+
+function drawText(ctx) {
   if (!userText || !dim) return;
-  const {fw, fh, bot} = dim;
+  const { fw, fh, bot } = dim;
+  
   let fs = 131;
   ctx.font = `${fs}px "Mrs Saint Delafield"`;
-  while (ctx.measureText(userText).width > fw-20 && fs > 16){
+  while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
     fs--;
     ctx.font = `${fs}px "Mrs Saint Delafield"`;
   }
-  ctx.fillStyle   = '#000';
-  ctx.textAlign   = 'center';
-  ctx.textBaseline= 'middle';
-  ctx.fillText(userText, fw/2, fh - bot/2);
-  lastFrameImageData = ctx.getImageData(0,0,fw,fh);
+  
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(userText, fw / 2, fh - bot / 2);
+  lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
 }
 
-/* ---------- save (sRGB JPEG) ---------- */
-saveBtn.onclick = () => {
-  if (!dim){ alert('Take a photo first'); return; }
-  const {fw, fh} = dim,
-        scale    = 1810/4420,
-        tmp      = document.createElement('canvas');
+/* ========== NEXT/RESET ========== */
+nextBtn.addEventListener('click', () => {
+  video.style.display = 'block';
+  canvas.style.display = 'none';
+  nextBtn.style.display = 'none';
+  textBtn.style.display = 'none';
+  saveBtn.style.display = 'none';
+  lastFrameImageData = null;
+  dim = null;
+  userText = '';
+});
 
-  tmp.width  = Math.floor(fw*scale);
-  tmp.height = Math.floor(fh*scale);
+/* ========== SAVE ========== */
+saveBtn.addEventListener('click', () => {
+  if (!dim) {
+    alert('Take a photo first');
+    return;
+  }
+  
+  const { fw, fh } = dim;
+  const scale = 1810 / 4420;
+  const tmp = document.createElement('canvas');
+  
+  tmp.width = Math.floor(fw * scale);
+  tmp.height = Math.floor(fh * scale);
   const tctx = tmp.getContext('2d');
-  tctx.drawImage(canvas,0,0,tmp.width,tmp.height);
-
+  tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
+  
   tmp.toBlob(blob => {
-    if (!blob){ alert('Save failed'); return; }
-    const a   = document.createElement('a');
-    a.href    = URL.createObjectURL(blob);
-    a.download= `photo-${Date.now()}.jpg`;
+    if (!blob) {
+      alert('Save failed');
+      return;
+    }
+    
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `photo-${Date.now()}.jpg`;
     a.click();
     URL.revokeObjectURL(a.href);
-
+    
     const fr = new FileReader();
     fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result);
     fr.readAsDataURL(blob);
-  }, 'image/jpeg', jpegQ/100);
-};
+  }, 'image/jpeg', jpegQ / 100);
+});
 
-/* ---------- gallery ---------- */
-document.getElementById('gallery-btn').onclick = () => {
-  const gal  = document.getElementById('gallery-content');
-  gal.innerHTML = '';
-  const keys = Object.keys(localStorage).filter(k => k.startsWith('saved-photo-')).sort().reverse();
-
-  if (!keys.length){
-    gal.innerHTML = '<p style="color:#fff">No saved images.</p>';
-  }else{
+/* ========== GALLERY ========== */
+document.getElementById('gallery-btn').addEventListener('click', () => {
+  const content = document.getElementById('gallery-content');
+  content.innerHTML = '';
+  
+  const keys = Object.keys(localStorage)
+    .filter(k => k.startsWith('saved-photo-'))
+    .sort()
+    .reverse();
+  
+  if (!keys.length) {
+    content.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">No saved images</p>';
+  } else {
     keys.forEach(k => {
-      const i = document.createElement('img');
-      i.src   = localStorage.getItem(k);
-      i.style.width = '100px';
-      gal.appendChild(i);
+      const img = document.createElement('img');
+      img.src = localStorage.getItem(k);
+      content.appendChild(img);
     });
   }
-  document.getElementById('gallery-overlay').style.display = 'block';
-};
-document.getElementById('menu-exit-btn').onclick = () => controls.classList.remove('show');
+  
+  document.getElementById('gallery-overlay').style.display = 'flex';
+});
 
-/* ---------- service worker & context menu ---------- */
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
-document.addEventListener('contextmenu', e => { if (e.target.id !== 'photo') e.preventDefault(); }, {passive:false});
+document.getElementById('gallery-close').addEventListener('click', () => {
+  document.getElementById('gallery-overlay').style.display = 'none';
+});
 
-/* ---------- kick things off ---------- */
+/* ========== INIT ========== */
 loadProfiles();
-refreshWBUI();
-refreshVignetteUI();
 bootCam();
-lockScroll();
+
+// Prevent context menu except on photo
+document.addEventListener('contextmenu', e => {
+  if (e.target.id !== 'photo') e.preventDefault();
+}, { passive: false });
 </script>
 
-<div id="gallery-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:99;overflow:auto;padding:10px">
-  <button onclick="this.parentNode.style.display='none'" style="position:fixed;top:10px;right:10px;z-index:100;">Close</button>
-  <div id="gallery-content" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:50px"></div>
-</div>
-
-</div> <!-- END #app wrapper -->
 </body>
 </html>
