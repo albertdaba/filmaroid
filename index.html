@@ -738,11 +738,69 @@ select {
     <div class="tab-panel" id="effects-panel">
       <div class="control-group">
         <div class="control-label">
-          <span>Film Grain</span>
+          <span>Exposure</span>
+          <span class="control-value" id="exposure-val">0</span>
+        </div>
+        <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0">
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>Highlight</span>
+          <span class="control-value" id="highlight-val">0</span>
+        </div>
+        <input type="range" id="highlight" min="-2" max="2" step="0.1" value="0">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>Shadow</span>
+          <span class="control-value" id="shadow-val">0</span>
+        </div>
+        <input type="range" id="shadow" min="-2" max="2" step="0.1" value="0">
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>Film Grain Amount</span>
           <span class="control-value" id="grain-val">0</span>
         </div>
         <input type="range" id="grain" min="0" max="50" value="0">
       </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>Film Grain Size</span>
+          <span class="control-value" id="grain-size-val">Medium</span>
+        </div>
+        <input type="range" id="grain-size" min="1" max="3" step="1" value="2">
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="control-group">
+        <label for="color-chrome" style="font-size: 13px; color: rgba(255,255,255,0.8); margin-bottom: 8px; display: block;">Color Chrome Effect</label>
+        <select id="color-chrome">
+          <option value="0">Off</option>
+          <option value="1">Weak</option>
+          <option value="2">Strong</option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label for="color-chrome-blue" style="font-size: 13px; color: rgba(255,255,255,0.8); margin-bottom: 8px; display: block;">Color Chrome FX Blue</label>
+        <select id="color-chrome-blue">
+          <option value="0">Off</option>
+          <option value="1">Weak</option>
+          <option value="2">Strong</option>
+        </select>
+      </div>
+      
+      <div class="divider"></div>
       
       <div class="control-group">
         <div class="control-label">
@@ -792,7 +850,15 @@ select {
           <span>White Balance - Red</span>
           <span class="control-value" id="wb-r-val">0</span>
         </div>
-        <input type="range" id="wb-r" min="-8" max="8" value="0">
+        <input type="range" id="wb-r" min="-10" max="10" value="0">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>White Balance - Green</span>
+          <span class="control-value" id="wb-g-val">0</span>
+        </div>
+        <input type="range" id="wb-g" min="-10" max="10" value="0">
       </div>
       
       <div class="control-group">
@@ -800,15 +866,31 @@ select {
           <span>White Balance - Blue</span>
           <span class="control-value" id="wb-b-val">0</span>
         </div>
-        <input type="range" id="wb-b" min="-8" max="8" value="0">
+        <input type="range" id="wb-b" min="-10" max="10" value="0">
       </div>
       
       <div class="control-group">
         <div class="control-label">
-          <span>Vignette</span>
+          <span>Vignette Intensity</span>
           <span class="control-value" id="vig-val">0</span>
         </div>
         <input type="range" id="vignette" min="0" max="100" value="0">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>Vignette Size</span>
+          <span class="control-value" id="vig-size-val">0.7</span>
+        </div>
+        <input type="range" id="vignette-size" min="0.3" max="1.2" step="0.05" value="0.7">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>Vignette Feather</span>
+          <span class="control-value" id="vig-feather-val">2.0</span>
+        </div>
+        <input type="range" id="vignette-feather" min="1" max="6" step="0.5" value="2.0">
       </div>
     </div>
     
@@ -975,12 +1057,19 @@ const sheetHandle = document.getElementById('sheet-handle');
 /* ========== STATE ========== */
 let stream = null;
 let grainAmt = 0;
+let grainSize = 2; // 1=small, 2=medium, 3=large
 let film = 'kodachrome';
 let jpegQ = 60;
 let userText = '';
 let dim = null;
 let lastFrameImageData = null;
 let activeProfileName = null;
+
+let exposureComp = 0;
+let highlightAdj = 0;
+let shadowAdj = 0;
+let colorChrome = 0; // 0=off, 1=weak, 2=strong
+let colorChromeBlue = 0; // 0=off, 1=weak, 2=strong
 
 const PROFILE_KEY = 'filmProfilesV1';
 let profiles = {};
@@ -1002,8 +1091,10 @@ const CM_KEY = 'colorMixSettingsV1';
 let cmState = { enable:false, dH:new Array(8).fill(0), dS:new Array(8).fill(0), dL:new Array(8).fill(0) };
 
 const WB_KEY = 'wbSettingsV1';
-let wb = { r:0, b:0 };
+let wb = { r:0, g:0, b:0 };
 let vignetteAmt = 0;
+let vignetteSize = 0.7;
+let vignetteFeather = 2.0;
 
 /* ========== TRICOLOR WHEEL STATE ========== */
 const TRICOLOR_KEY = 'tricolorSettingsV1';
@@ -1037,6 +1128,16 @@ try {
 try {
   const savedVig = +localStorage.getItem('vignetteAmtV1');
   if (!isNaN(savedVig)) vignetteAmt = savedVig;
+} catch {}
+
+try {
+  const savedVigSize = +localStorage.getItem('vignetteSizeV1');
+  if (!isNaN(savedVigSize)) vignetteSize = savedVigSize;
+} catch {}
+
+try {
+  const savedVigFeather = +localStorage.getItem('vignetteFeatherV1');
+  if (!isNaN(savedVigFeather)) vignetteFeather = savedVigFeather;
 } catch {}
 
 try {
@@ -1118,11 +1219,56 @@ document.querySelectorAll('.preset-card').forEach(card => {
 });
 
 /* ========== SLIDERS ========== */
+const exposureSlider = document.getElementById('exposure');
+const exposureVal = document.getElementById('exposure-val');
+exposureSlider.addEventListener('input', () => {
+  exposureComp = +exposureSlider.value;
+  exposureVal.textContent = exposureComp > 0 ? '+' + exposureComp.toFixed(1) : exposureComp.toFixed(1);
+  if (lastFrameImageData) shootReprocess();
+});
+
+const highlightSlider = document.getElementById('highlight');
+const highlightVal = document.getElementById('highlight-val');
+highlightSlider.addEventListener('input', () => {
+  highlightAdj = +highlightSlider.value;
+  highlightVal.textContent = highlightAdj > 0 ? '+' + highlightAdj.toFixed(1) : highlightAdj.toFixed(1);
+  if (lastFrameImageData) shootReprocess();
+});
+
+const shadowSlider = document.getElementById('shadow');
+const shadowVal = document.getElementById('shadow-val');
+shadowSlider.addEventListener('input', () => {
+  shadowAdj = +shadowSlider.value;
+  shadowVal.textContent = shadowAdj > 0 ? '+' + shadowAdj.toFixed(1) : shadowAdj.toFixed(1);
+  if (lastFrameImageData) shootReprocess();
+});
+
 const grainSlider = document.getElementById('grain');
 const grainVal = document.getElementById('grain-val');
 grainSlider.addEventListener('input', () => {
   grainAmt = +grainSlider.value;
   grainVal.textContent = grainAmt;
+  if (lastFrameImageData) shootReprocess();
+});
+
+const grainSizeSlider = document.getElementById('grain-size');
+const grainSizeVal = document.getElementById('grain-size-val');
+grainSizeSlider.addEventListener('input', () => {
+  grainSize = +grainSizeSlider.value;
+  const labels = ['', 'Small', 'Medium', 'Large'];
+  grainSizeVal.textContent = labels[grainSize];
+  if (lastFrameImageData) shootReprocess();
+});
+
+const colorChromeSelect = document.getElementById('color-chrome');
+colorChromeSelect.addEventListener('change', () => {
+  colorChrome = +colorChromeSelect.value;
+  if (lastFrameImageData) shootReprocess();
+});
+
+const colorChromeBlueSelect = document.getElementById('color-chrome-blue');
+colorChromeBlueSelect.addEventListener('change', () => {
+  colorChromeBlue = +colorChromeBlueSelect.value;
   if (lastFrameImageData) shootReprocess();
 });
 
@@ -1138,6 +1284,15 @@ const wbRVal = document.getElementById('wb-r-val');
 wbRSlider.addEventListener('input', () => {
   wb.r = +wbRSlider.value;
   wbRVal.textContent = wb.r;
+  localStorage.setItem(WB_KEY, JSON.stringify(wb));
+  if (lastFrameImageData) shootReprocess();
+});
+
+const wbGSlider = document.getElementById('wb-g');
+const wbGVal = document.getElementById('wb-g-val');
+wbGSlider.addEventListener('input', () => {
+  wb.g = +wbGSlider.value;
+  wbGVal.textContent = wb.g;
   localStorage.setItem(WB_KEY, JSON.stringify(wb));
   if (lastFrameImageData) shootReprocess();
 });
@@ -1160,13 +1315,37 @@ vignetteSlider.addEventListener('input', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
+const vignetteSizeSlider = document.getElementById('vignette-size');
+const vigSizeVal = document.getElementById('vig-size-val');
+vignetteSizeSlider.addEventListener('input', () => {
+  vignetteSize = +vignetteSizeSlider.value;
+  vigSizeVal.textContent = vignetteSize.toFixed(2);
+  localStorage.setItem('vignetteSizeV1', String(vignetteSize));
+  if (lastFrameImageData) shootReprocess();
+});
+
+const vignetteFeatherSlider = document.getElementById('vignette-feather');
+const vigFeatherVal = document.getElementById('vig-feather-val');
+vignetteFeatherSlider.addEventListener('input', () => {
+  vignetteFeather = +vignetteFeatherSlider.value;
+  vigFeatherVal.textContent = vignetteFeather.toFixed(1);
+  localStorage.setItem('vignetteFeatherV1', String(vignetteFeather));
+  if (lastFrameImageData) shootReprocess();
+});
+
 // Initialize slider displays
 wbRVal.textContent = wb.r;
+wbGVal.textContent = wb.g;
 wbBVal.textContent = wb.b;
 vigVal.textContent = vignetteAmt;
+vigSizeVal.textContent = vignetteSize.toFixed(2);
+vigFeatherVal.textContent = vignetteFeather.toFixed(1);
 wbRSlider.value = wb.r;
+wbGSlider.value = wb.g;
 wbBSlider.value = wb.b;
 vignetteSlider.value = vignetteAmt;
+vignetteSizeSlider.value = vignetteSize;
+vignetteFeatherSlider.value = vignetteFeather;
 
 /* ========== HALATION ========== */
 const halationEnable = document.getElementById('halation-enable');
@@ -1551,9 +1730,31 @@ function applyProfile(name) {
   if (!p) return;
   
   film = p.filmBase || 'kodachrome';
-  grainAmt = p.grainAmt || 19;
+  grainAmt = p.grainAmt || 0;
+  grainSize = p.grainSize || 2;
+  exposureComp = p.exposureComp || 0;
+  highlightAdj = p.highlightAdj || 0;
+  shadowAdj = p.shadowAdj || 0;
+  colorChrome = p.colorChrome || 0;
+  colorChromeBlue = p.colorChromeBlue || 0;
+  
   grainSlider.value = grainAmt;
   grainVal.textContent = grainAmt;
+  grainSizeSlider.value = grainSize;
+  const labels = ['', 'Small', 'Medium', 'Large'];
+  grainSizeVal.textContent = labels[grainSize];
+  
+  exposureSlider.value = exposureComp;
+  exposureVal.textContent = exposureComp > 0 ? '+' + exposureComp.toFixed(1) : exposureComp.toFixed(1);
+  
+  highlightSlider.value = highlightAdj;
+  highlightVal.textContent = highlightAdj > 0 ? '+' + highlightAdj.toFixed(1) : highlightAdj.toFixed(1);
+  
+  shadowSlider.value = shadowAdj;
+  shadowVal.textContent = shadowAdj > 0 ? '+' + shadowAdj.toFixed(1) : shadowAdj.toFixed(1);
+  
+  colorChromeSelect.value = colorChrome;
+  colorChromeBlueSelect.value = colorChromeBlue;
   
   if (p.cmState) {
     cmState = JSON.parse(JSON.stringify(p.cmState));
@@ -1565,10 +1766,12 @@ function applyProfile(name) {
   }
   
   if (p.wb) {
-    wb = { r: p.wb.r || 0, b: p.wb.b || 0 };
+    wb = { r: p.wb.r || 0, g: p.wb.g || 0, b: p.wb.b || 0 };
     wbRSlider.value = wb.r;
+    wbGSlider.value = wb.g;
     wbBSlider.value = wb.b;
     wbRVal.textContent = wb.r;
+    wbGVal.textContent = wb.g;
     wbBVal.textContent = wb.b;
     localStorage.setItem(WB_KEY, JSON.stringify(wb));
   }
@@ -1578,6 +1781,20 @@ function applyProfile(name) {
     vignetteSlider.value = vignetteAmt;
     vigVal.textContent = vignetteAmt;
     localStorage.setItem('vignetteAmtV1', String(vignetteAmt));
+  }
+  
+  if (typeof p.vignetteSize === 'number') {
+    vignetteSize = p.vignetteSize;
+    vignetteSizeSlider.value = vignetteSize;
+    vigSizeVal.textContent = vignetteSize.toFixed(2);
+    localStorage.setItem('vignetteSizeV1', String(vignetteSize));
+  }
+  
+  if (typeof p.vignetteFeather === 'number') {
+    vignetteFeather = p.vignetteFeather;
+    vignetteFeatherSlider.value = vignetteFeather;
+    vigFeatherVal.textContent = vignetteFeather.toFixed(1);
+    localStorage.setItem('vignetteFeatherV1', String(vignetteFeather));
   }
   
   if (p.tricolorState) {
@@ -1707,9 +1924,17 @@ document.getElementById('save-profile-btn').addEventListener('click', () => {
   profiles[name] = {
     filmBase: film,
     grainAmt,
+    grainSize,
+    exposureComp,
+    highlightAdj,
+    shadowAdj,
+    colorChrome,
+    colorChromeBlue,
     cmState: JSON.parse(JSON.stringify(cmState)),
     wb: { ...wb },
     vignetteAmt,
+    vignetteSize,
+    vignetteFeather,
     tricolorState: JSON.parse(JSON.stringify(tricolorState)),
     halationState: JSON.parse(JSON.stringify(halationState))
   };
@@ -1779,7 +2004,7 @@ document.getElementById('camera-switch').addEventListener('click', () => {
 /* ========== WORKER ========== */
 const workerSrc = `
 self.onmessage = (e) => {
-  const { imageData, film, grainAmt, cmState, colors, hueWidth, wb, vignetteAmt, tricolorState, halationState } = e.data;
+  const { imageData, film, grainAmt, grainSize, exposureComp, highlightAdj, shadowAdj, colorChrome, colorChromeBlue, cmState, colors, hueWidth, wb, vignetteAmt, vignetteSize, vignetteFeather, tricolorState, halationState } = e.data;
   const d = imageData.data;
   const useColorMix = cmState.enable && film !== 'acros';
   const useTricolor = tricolorState.enable && film !== 'acros';
@@ -1955,26 +2180,136 @@ self.onmessage = (e) => {
     return { sat: 0, lum: 0 };
   }
 
-  let seed = 1234567;
-  function fastNoise(){
-    seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
-    return ((seed>>>0) / 0x7fffffff) * 2 - 1;
+  // ========== PERLIN NOISE FOR FILM GRAIN ==========
+  
+  // Perlin noise generator for structured film grain
+  function perlinNoise(x, y, scale, octaves) {
+    let value = 0;
+    let amplitude = 1;
+    let frequency = scale;
+    let maxValue = 0;
+    
+    for (let i = 0; i < octaves; i++) {
+      const sampleX = x * frequency;
+      const sampleY = y * frequency;
+      
+      // Grid coordinates
+      const x0 = Math.floor(sampleX);
+      const x1 = x0 + 1;
+      const y0 = Math.floor(sampleY);
+      const y1 = y0 + 1;
+      
+      // Interpolation weights
+      const sx = sampleX - x0;
+      const sy = sampleY - y0;
+      
+      // Gradient vectors (pseudo-random)
+      const hash = (x, y) => {
+        let h = x * 374761393 + y * 668265263;
+        h = (h ^ (h >>> 13)) * 1274126177;
+        return ((h ^ (h >>> 16)) & 0x7fffffff) / 0x7fffffff * 2 - 1;
+      };
+      
+      const g00 = hash(x0, y0);
+      const g10 = hash(x1, y0);
+      const g01 = hash(x0, y1);
+      const g11 = hash(x1, y1);
+      
+      // Interpolate
+      const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+      const u = fade(sx);
+      const v = fade(sy);
+      
+      const nx0 = g00 * (1 - u) + g10 * u;
+      const nx1 = g01 * (1 - u) + g11 * u;
+      const nxy = nx0 * (1 - v) + nx1 * v;
+      
+      value += nxy * amplitude;
+      maxValue += amplitude;
+      
+      amplitude *= 0.5;
+      frequency *= 2;
+    }
+    
+    return value / maxValue;
   }
-
-  const gainR = 1 + (wb.r || 0) * 0.06;
-  const gainB = 1 + (wb.b || 0) * 0.06;
 
   const W = imageData.width, H = imageData.height;
   const cx = W * 0.5, cy = H * 0.5;
-  const maxR = Math.min(W, H) * 0.5;
+  
+  // Elliptical vignette setup (follows aspect ratio)
+  const aspectRatio = W / H;
+  const radiusX = (W * 0.5) * vignetteSize;
+  const radiusY = (H * 0.5) * vignetteSize;
+  
+  // Diagonal distance for proper corner coverage
+  const maxDist = Math.sqrt(W * W + H * H) * 0.5;
+  
   const vigPower = (vignetteAmt||0) / 100;
+  const featherPower = vignetteFeather || 2.0;
 
   for (let y=0; y<H; y++){
     for (let x=0; x<W; x++){
       const i = (y*W + x) * 4;
       let r = d[i], g = d[i+1], bl = d[i+2];
 
-      // Film simulation base
+      // ========== STEP 1: EXPOSURE COMPENSATION (IN LINEAR SPACE) ==========
+      if (exposureComp !== 0) {
+        // Convert to linear space for proper exposure
+        const toLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4);
+        const toGamma = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+        
+        let rLin = toLinear(r);
+        let gLin = toLinear(g);
+        let bLin = toLinear(bl);
+        
+        // Apply exposure as stops (2^stops)
+        const multiplier = Math.pow(2, exposureComp);
+        rLin *= multiplier;
+        gLin *= multiplier;
+        bLin *= multiplier;
+        
+        r = Math.max(0, Math.min(255, toGamma(rLin) * 255));
+        g = Math.max(0, Math.min(255, toGamma(gLin) * 255));
+        bl = Math.max(0, Math.min(255, toGamma(bLin) * 255));
+      }
+
+      // ========== STEP 2: WHITE BALANCE (LAB SPACE) ==========
+      if (wb.r !== 0 || wb.g !== 0 || wb.b !== 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        const [labL, labA, labB] = lchToLab(L, C, H);
+        
+        const aShift = (wb.r - wb.g) * 3;
+        const bShift = (wb.b - (wb.r + wb.g) * 0.5) * 3;
+        
+        const newA = labA + aShift;
+        const newB = labB + bShift;
+        
+        [L, C, H] = labToLch(labL, newA, newB);
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      // ========== STEP 3: TONE CURVE (HIGHLIGHT/SHADOW) ==========
+      if (highlightAdj !== 0 || shadowAdj !== 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        
+        // Shadow adjustment (affects 0-30% luminance)
+        if (shadowAdj !== 0 && L < 30) {
+          const shadowStrength = (30 - L) / 30;  // 1.0 at L=0, 0.0 at L=30
+          L = L * (1 + shadowAdj * 0.15 * shadowStrength);
+        }
+        
+        // Highlight adjustment (affects 70-100% luminance)
+        if (highlightAdj !== 0 && L > 70) {
+          const highlightStrength = (L - 70) / 30;  // 0.0 at L=70, 1.0 at L=100
+          L = L * (1 + highlightAdj * 0.15 * highlightStrength);
+        }
+        
+        L = Math.max(0, Math.min(100, L));
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      // ========== STEP 4: FILM SIMULATION BASE ==========
       if (film === 'acros'){
         const a = (r+g+bl)/3;
         r=g=bl=a;
@@ -1985,36 +2320,80 @@ self.onmessage = (e) => {
         bl = bl*.85 + a*.15;
       }
 
-      // ========== IMPROVED PER-COLOR ADJUSTMENTS (LCH) ==========
+      // ========== STEP 5: PER-COLOR ADJUSTMENTS (LCH) ==========
       if (useColorMix){
         let [L, C, H] = rgbToLch(r, g, bl);
         
-        // Only adjust colored pixels (not grays)
         if (C > 5) {
           const adj = getAdjustmentsForHue(H, cmState);
-          
-          // Apply saturation adjustment (chroma in LCH)
-          // Scale based on current chroma to avoid over-saturation
           const chromaMultiplier = 1 + (adj.sat * 0.8);
           C = Math.max(0, Math.min(130, C * chromaMultiplier));
-          
-          // Apply luminance adjustment
-          // Perceptually uniform in LAB space
           L = Math.max(0, Math.min(100, L + adj.lum * 40));
         }
         
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // ========== IMPROVED TRICOLOR GRADING (LCH) ==========
+      // ========== STEP 6: COLOR CHROME EFFECT ==========
+      // Deepens already-saturated colors (reds, yellows, greens)
+      if (colorChrome > 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        
+        // Only affect already-vibrant colors (C > 40)
+        if (C > 40) {
+          const strength = colorChrome === 1 ? 0.3 : 0.6; // Weak or Strong
+          
+          // Boost chroma more for reds/yellows/greens
+          let colorBoost = 1.0;
+          if ((H >= 0 && H <= 60) || (H >= 330 && H <= 360)) {
+            // Reds
+            colorBoost = 1.4;
+          } else if (H >= 40 && H <= 80) {
+            // Yellows
+            colorBoost = 1.2;
+          } else if (H >= 80 && H <= 160) {
+            // Greens
+            colorBoost = 1.15;
+          }
+          
+          const saturationFactor = Math.pow((C - 40) / 90, 0.6);
+          C = C + saturationFactor * strength * 35 * colorBoost;
+          
+          // Slightly darken to "deepen" the tone
+          L = L * (1 - saturationFactor * strength * 0.08);
+        }
+        
+        C = Math.max(0, Math.min(130, C));
+        L = Math.max(0, Math.min(100, L));
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      // ========== STEP 7: COLOR CHROME FX BLUE ==========
+      // Specifically deepens blues (polarizer-like effect)
+      if (colorChromeBlue > 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        
+        // Target blue hues (200-260°) with saturation
+        if (H >= 200 && H <= 260 && C > 20) {
+          const strength = colorChromeBlue === 1 ? 0.4 : 0.7;
+          const blueStrength = 1 - Math.abs(H - 230) / 30;  // Peak at 230°
+          
+          C = C * (1 + strength * blueStrength * 0.5);
+          L = L * (1 - strength * blueStrength * 0.12);  // Darken for depth
+        }
+        
+        C = Math.max(0, Math.min(130, C));
+        L = Math.max(0, Math.min(100, L));
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      // ========== STEP 8: TRICOLOR GRADING (LCH) ==========
       if (useTricolor){
         let [L, C, H] = rgbToLch(r, g, bl);
         
-        // Determine luminance zone with smooth transitions
         const lumNorm = L / 100;
         let shadowWeight = 0, midtoneWeight = 0, highlightWeight = 0;
         
-        // Smoother zone transitions using gaussians
         if (lumNorm < 0.5) {
           shadowWeight = Math.exp(-8 * (lumNorm - 0.15) * (lumNorm - 0.15));
           midtoneWeight = Math.exp(-8 * (lumNorm - 0.4) * (lumNorm - 0.4));
@@ -2023,7 +2402,6 @@ self.onmessage = (e) => {
           highlightWeight = Math.exp(-8 * (lumNorm - 0.85) * (lumNorm - 0.85));
         }
         
-        // Normalize weights
         const totalWeight = shadowWeight + midtoneWeight + highlightWeight;
         if (totalWeight > 0) {
           shadowWeight /= totalWeight;
@@ -2031,7 +2409,6 @@ self.onmessage = (e) => {
           highlightWeight /= totalWeight;
         }
         
-        // Apply color tints as hue shifts with strength modulation
         let hueShift = 0;
         let chromaBoost = 0;
         
@@ -2039,7 +2416,6 @@ self.onmessage = (e) => {
           const strength = (tricolorState.shadow.strength / 100) * shadowWeight;
           const targetHue = tricolorState.shadow.hue;
           
-          // Calculate shortest path to target hue
           let hueDelta = targetHue - H;
           if (hueDelta > 180) hueDelta -= 360;
           if (hueDelta < -180) hueDelta += 360;
@@ -2072,39 +2448,55 @@ self.onmessage = (e) => {
           chromaBoost += strength * 20;
         }
         
-        // Apply adjustments
         H = (H + hueShift + 360) % 360;
         C = Math.max(0, Math.min(130, C + chromaBoost));
         
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      r = r * gainR;
-      bl = bl * gainB;
-
+      // ========== STEP 9: FILM GRAIN (PERLIN NOISE) ==========
       if (grainAmt > 0){
         const normalizedGrain = grainAmt / 50;
-        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 20;
+        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 15;
         
-        const baseNoise = fastNoise();
-        const rNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
-        const gNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
-        const bNoise = (baseNoise + fastNoise() * 0.3) * actualIntensity;
+        // Grain size determines scale (1=small, 2=medium, 3=large)
+        const scaleMap = [0, 0.015, 0.008, 0.004];  // Smaller scale = finer grain
+        const scale = scaleMap[grainSize] || 0.008;
+        const octaves = grainSize === 1 ? 3 : 2;  // More octaves for small grain
         
+        // Generate Perlin noise for each channel with slight offset
+        const rNoise = perlinNoise(x + 1000, y, scale, octaves) * actualIntensity;
+        const gNoise = perlinNoise(x + 2000, y, scale, octaves) * actualIntensity;
+        const bNoise = perlinNoise(x + 3000, y, scale, octaves) * actualIntensity;
+        
+        // Luminance-dependent: more visible in midtones
         const lum = (r + g + bl) / 3;
-        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.6;
+        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.5;
         
         r += rNoise * lumFactor;
         g += gNoise * lumFactor;
         bl += bNoise * lumFactor;
       }
 
+      // ========== STEP 10: VIGNETTE (ELLIPTICAL, QUARTIC) ==========
       if (vigPower > 0){
-        const dx = x - cx, dy = y - cy;
-        const rr = Math.sqrt(dx*dx + dy*dy) / maxR;
-        const fall = Math.min(1, Math.max(0, rr));
-        const vFactor = 1 - vigPower * (fall*fall);
-        r *= vFactor; g *= vFactor; bl *= vFactor;
+        const dx = x - cx;
+        const dy = y - cy;
+        
+        // Elliptical distance (normalized to 0-1)
+        const distX = dx / radiusX;
+        const distY = dy / radiusY;
+        const ellipticalDist = Math.sqrt(distX * distX + distY * distY);
+        
+        // Quartic falloff (cos^4 law for natural lens vignetting)
+        // featherPower controls how gradual the transition is (2-6)
+        const fall = Math.min(1, Math.max(0, ellipticalDist));
+        const vignetteFactor = 1 - vigPower * Math.pow(fall, featherPower);
+        
+        // Apply vignette
+        r *= vignetteFactor;
+        g *= vignetteFactor;
+        bl *= vignetteFactor;
       }
 
       d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
@@ -2281,11 +2673,19 @@ async function shoot() {
     imageData: roi,
     film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
     grainAmt,
+    grainSize,
+    exposureComp,
+    highlightAdj,
+    shadowAdj,
+    colorChrome,
+    colorChromeBlue,
     cmState,
     colors,
     hueWidth,
     wb,
     vignetteAmt,
+    vignetteSize,
+    vignetteFeather,
     tricolorState,
     halationState
   }, [roi.data.buffer]);
@@ -2311,11 +2711,19 @@ function shootReprocess() {
     imageData: roi,
     film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
     grainAmt,
+    grainSize,
+    exposureComp,
+    highlightAdj,
+    shadowAdj,
+    colorChrome,
+    colorChromeBlue,
     cmState,
     colors,
     hueWidth,
     wb,
     vignetteAmt,
+    vignetteSize,
+    vignetteFeather,
     tricolorState,
     halationState
   }, [roi.data.buffer]);
