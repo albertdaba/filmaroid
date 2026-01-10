@@ -2,1025 +2,137 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Camera PWA – Film App (Mobile Optimized)</title>
+  <title>Camera PWA – Film App with GIF</title>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#000000">
-  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
   <style>
-:root {
-  --ui-scale: 1;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-top: env(safe-area-inset-top, 0px);
-}
-
-* { 
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  background: #000;
-  color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 14px;
-  height: 100vh;
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
-}
-
-/* ========== VIEWFINDER ========== */
-#viewfinder-container {
-  position: fixed;
-  top: var(--safe-top);
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-}
-
-video, canvas, #photo {
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 3/4;
-  object-fit: contain;
-  background: #000;
-}
-
-#video {
-  display: block;
-}
-
-canvas, #photo {
-  display: none;
-}
-
-/* ========== TOP BAR ========== */
-#top-bar {
-  position: fixed;
-  top: var(--safe-top);
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 20px;
-  z-index: 10;
-  pointer-events: none;
-}
-
-#top-bar button {
-  pointer-events: auto;
-  background: rgba(0,0,0,0.5);
-  border: 1px solid rgba(255,255,255,0.3);
-  color: #fff;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 13px;
-  backdrop-filter: blur(10px);
-  cursor: pointer;
-}
-
-/* ========== SHUTTER & CONTROLS BAR ========== */
-#bottom-controls {
-  position: fixed;
-  bottom: calc(var(--safe-bottom) + 20px);
-  left: 0;
-  right: 0;
-  height: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 20px;
-  z-index: 10;
-  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-}
-
-#shutter {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  border: 4px solid #fff;
-  background: rgba(255,255,255,0.1);
-  cursor: pointer;
-  transition: transform 0.1s;
-}
-
-#shutter:active {
-  transform: scale(0.95);
-}
-
-#menu-trigger, #next-btn, #save-btn, #text-btn {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.2);
-  border: 1px solid rgba(255,255,255,0.3);
-  color: #fff;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-}
-
-#next-btn, #save-btn, #text-btn {
-  display: none;
-}
-
-/* ========== BOTTOM SHEET ========== */
-#bottom-sheet {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #1c1c1e;
-  border-radius: 20px 20px 0 0;
-  transform: translateY(100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 50;
-  max-height: 70vh;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: var(--safe-bottom);
-}
-
-#bottom-sheet.expanded {
-  transform: translateY(0);
-}
-
-#sheet-handle {
-  width: 40px;
-  height: 5px;
-  background: rgba(255,255,255,0.3);
-  border-radius: 3px;
-  margin: 12px auto 8px;
-  cursor: grab;
-}
-
-#sheet-title {
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 0 20px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-/* ========== TABS ========== */
-#tabs {
-  display: flex;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  background: #1c1c1e;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.tab {
-  flex: 1;
-  padding: 12px 8px;
-  text-align: center;
-  font-size: 13px;
-  color: rgba(255,255,255,0.6);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-}
-
-.tab.active {
-  color: #fff;
-  border-bottom-color: #007aff;
-}
-
-/* ========== TAB CONTENT ========== */
-#tab-content {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.tab-panel {
-  display: none;
-  padding: 16px;
-}
-
-.tab-panel.active {
-  display: block;
-}
-
-/* ========== FORM CONTROLS ========== */
-.control-group {
-  margin-bottom: 20px;
-}
-
-.control-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.8);
-}
-
-.control-value {
-  color: #007aff;
-  font-weight: 600;
-}
-
-input[type="range"] {
-  width: 100%;
-  height: 36px;
-  -webkit-appearance: none;
-  background: transparent;
-  margin: 0;
-}
-
-input[type="range"]::-webkit-slider-track {
-  width: 100%;
-  height: 4px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 2px;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  height: 24px;
-  width: 24px;
-  border-radius: 50%;
-  background: #fff;
-  cursor: pointer;
-  margin-top: -10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-
-input[type="range"]::-moz-range-track {
-  width: 100%;
-  height: 4px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 2px;
-}
-
-input[type="range"]::-moz-range-thumb {
-  height: 24px;
-  width: 24px;
-  border-radius: 50%;
-  background: #fff;
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-
-select {
-  width: 100%;
-  padding: 10px 14px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 10px;
-  color: #fff;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-/* ========== PRESET GRID ========== */
-#preset-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-}
-
-.preset-card {
-  padding: 16px 12px;
-  background: rgba(255,255,255,0.08);
-  border: 2px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.preset-card:active {
-  transform: scale(0.98);
-}
-
-.preset-card.active {
-  background: rgba(0,122,255,0.2);
-  border-color: #007aff;
-}
-
-.preset-share-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(0,122,255,0.8);
-  border: none;
-  color: #fff;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 2;
-}
-
-.preset-share-btn:active {
-  transform: scale(0.9);
-}
-
-.preset-delete-btn {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(255,59,48,0.8);
-  border: none;
-  color: #fff;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 2;
-}
-
-.preset-delete-btn:active {
-  transform: scale(0.9);
-}
-
-.preset-name {
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.preset-desc {
-  font-size: 11px;
-  color: rgba(255,255,255,0.6);
-}
-
-/* ========== COLOR MIX ========== */
-.color-palette {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  -webkit-overflow-scrolling: touch;
-}
-
-.color-chip {
-  min-width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.color-chip.selected {
-  border-color: #fff;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
-}
-
-.color-info {
-  font-size: 12px;
-  color: rgba(255,255,255,0.7);
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: rgba(255,255,255,0.05);
-  border-radius: 8px;
-}
-
-.toggle-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: rgba(255,255,255,0.05);
-  border-radius: 12px;
-  margin-bottom: 16px;
-}
-
-.toggle-section input[type="checkbox"] {
-  width: 50px;
-  height: 28px;
-  -webkit-appearance: none;
-  background: rgba(255,255,255,0.2);
-  border-radius: 14px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.toggle-section input[type="checkbox"]:checked {
-  background: #007aff;
-}
-
-.toggle-section input[type="checkbox"]::before {
-  content: '';
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  background: #fff;
-  border-radius: 50%;
-  top: 2px;
-  left: 2px;
-  transition: transform 0.2s;
-}
-
-.toggle-section input[type="checkbox"]:checked::before {
-  transform: translateX(22px);
-}
-
-/* ========== TRICOLOR WHEEL ========== */
-.tricolor-section {
-  margin-bottom: 16px;
-}
-
-.tricolor-label {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: #fff;
-}
-
-.hue-wheel {
-  width: 100%;
-  height: 50px;
-  border-radius: 25px;
-  margin-bottom: 12px;
-  background: linear-gradient(to right, 
-    hsl(0, 100%, 50%),
-    hsl(30, 100%, 50%),
-    hsl(60, 100%, 50%),
-    hsl(90, 100%, 50%),
-    hsl(120, 100%, 50%),
-    hsl(150, 100%, 50%),
-    hsl(180, 100%, 50%),
-    hsl(210, 100%, 50%),
-    hsl(240, 100%, 50%),
-    hsl(270, 100%, 50%),
-    hsl(300, 100%, 50%),
-    hsl(330, 100%, 50%),
-    hsl(360, 100%, 50%)
-  );
-  position: relative;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  --indicator-left: 50%;
-}
-
-.hue-wheel::after {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 3px solid #fff;
-  top: 50%;
-  left: var(--indicator-left);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-}
-
-/* ========== BUTTONS ========== */
-.btn-primary {
-  width: 100%;
-  padding: 12px;
-  background: #007aff;
-  border: none;
-  border-radius: 12px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.btn-primary:active {
-  opacity: 0.8;
-}
-
-.btn-secondary {
-  width: 100%;
-  padding: 12px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 12px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 12px;
-}
-
-/* ========== PROCESSING OVERLAY ========== */
-#processing {
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.7);
-  z-index: 100;
-  font-size: 16px;
-  backdrop-filter: blur(5px);
-}
-
-/* ========== TEXT MODAL ========== */
-#text-modal {
-  position: fixed;
-  bottom: calc(var(--safe-bottom) + 20px);
-  left: 20px;
-  right: 20px;
-  background: #1c1c1e;
-  padding: 20px;
-  border-radius: 16px;
-  display: none;
-  flex-direction: column;
-  gap: 12px;
-  z-index: 60;
-}
-
-#text-modal input {
-  width: 100%;
-  padding: 14px 16px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 10px;
-  color: #fff;
-  font-size: 16px;
-  user-select: auto;
-  -webkit-user-select: auto;
-}
-
-#text-modal .modal-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-#text-modal .modal-buttons button {
-  flex: 1;
-  padding: 12px;
-  border-radius: 10px;
-  border: none;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-/* ========== GALLERY ========== */
-#gallery-overlay {
-  position: fixed;
-  inset: 0;
-  background: #000;
-  z-index: 100;
-  display: none;
-  flex-direction: column;
-  padding: var(--safe-top) 0 var(--safe-bottom) 0;
-}
-
-#gallery-header {
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-#gallery-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-#gallery-content img {
-  width: 100%;
-  border-radius: 8px;
-  aspect-ratio: 3/4;
-  object-fit: cover;
-}
-
-/* ========== CAMERA SELECTOR ========== */
-#camera-selector {
-  position: fixed;
-  bottom: calc(var(--safe-bottom) + 120px);
-  left: 20px;
-  background: rgba(0,0,0,0.8);
-  border-radius: 12px;
-  padding: 12px;
-  display: none;
-  flex-direction: column;
-  gap: 8px;
-  backdrop-filter: blur(10px);
-  z-index: 15;
-}
-
-.camera-option {
-  padding: 10px 14px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 8px;
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  min-width: 150px;
-}
-
-.camera-option:active {
-  background: rgba(255,255,255,0.2);
-}
-
-.divider {
-  height: 1px;
-  background: rgba(255,255,255,0.1);
-  margin: 16px 0;
-}
-
-#photo {
-  user-select: auto;
-  -webkit-user-select: auto;
-}
-
+:root { --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-top: env(safe-area-inset-top, 0px); }
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
+#viewfinder-container { position: fixed; top: var(--safe-top); left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+video, canvas, #photo { width: 100%; max-width: 480px; aspect-ratio: 3/4; object-fit: contain; background: #000; }
+#video { display: block; } canvas, #photo { display: none; }
+#top-bar { position: fixed; top: var(--safe-top); left: 0; right: 0; height: 60px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent); display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; z-index: 10; pointer-events: none; }
+#top-bar button { pointer-events: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; backdrop-filter: blur(10px); cursor: pointer; }
+#bottom-controls { position: fixed; bottom: calc(var(--safe-bottom) + 20px); left: 0; right: 0; height: 90px; display: flex; align-items: center; justify-content: space-around; padding: 0 20px; z-index: 10; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); }
+#shutter { width: 70px; height: 70px; border-radius: 50%; border: 4px solid #fff; background: rgba(255,255,255,0.1); cursor: pointer; transition: transform 0.1s; }
+#shutter:active { transform: scale(0.95); }
+#menu-trigger, #next-btn, #save-btn, #text-btn, #gif-btn { width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(10px); }
+#gif-btn { background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3); border: 2px solid rgba(255,255,255,0.5); font-size: 11px; font-weight: 700; }
+#gif-btn.recording { animation: gif-pulse 0.5s ease-in-out infinite; background: #ff3b30; border-color: #fff; }
+@keyframes gif-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+#next-btn, #save-btn, #text-btn { display: none; }
+#gif-status { position: fixed; top: calc(var(--safe-top) + 70px); left: 50%; transform: translateX(-50%); background: rgba(255,59,48,0.9); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; display: none; z-index: 100; backdrop-filter: blur(10px); }
+#gif-status.visible { display: flex; align-items: center; gap: 8px; }
+#gif-status::before { content: ''; width: 10px; height: 10px; background: #fff; border-radius: 50%; animation: blink 1s infinite; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+#bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #1c1c1e; border-radius: 20px 20px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; max-height: 70vh; display: flex; flex-direction: column; padding-bottom: var(--safe-bottom); }
+#bottom-sheet.expanded { transform: translateY(0); }
+#sheet-handle { width: 40px; height: 5px; background: rgba(255,255,255,0.3); border-radius: 3px; margin: 12px auto 8px; cursor: grab; }
+#sheet-title { text-align: center; font-size: 14px; font-weight: 600; padding: 0 20px 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+#tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.1); background: #1c1c1e; }
+.tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 13px; color: rgba(255,255,255,0.6); cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; }
+.tab.active { color: #fff; border-bottom-color: #007aff; }
+#tab-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.tab-panel { display: none; padding: 16px; }
+.tab-panel.active { display: block; }
+.control-group { margin-bottom: 20px; }
+.control-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: rgba(255,255,255,0.8); }
+.control-value { color: #007aff; font-weight: 600; }
+input[type="range"] { width: 100%; height: 36px; -webkit-appearance: none; background: transparent; }
+input[type="range"]::-webkit-slider-track { width: 100%; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #fff; cursor: pointer; margin-top: -10px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+select { width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-size: 14px; }
+#preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.preset-card { padding: 16px 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; text-align: center; position: relative; }
+.preset-card.active { background: rgba(0,122,255,0.2); border-color: #007aff; }
+.preset-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.preset-desc { font-size: 11px; color: rgba(255,255,255,0.6); }
+.btn-secondary { width: 100%; padding: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+.divider { height: 1px; background: rgba(255,255,255,0.1); margin: 16px 0; }
+.toggle-section { display: flex; align-items: center; gap: 12px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 16px; }
+.toggle-section input[type="checkbox"] { width: 50px; height: 28px; -webkit-appearance: none; background: rgba(255,255,255,0.2); border-radius: 14px; position: relative; cursor: pointer; }
+.toggle-section input[type="checkbox"]:checked { background: #007aff; }
+.toggle-section input[type="checkbox"]::before { content: ''; position: absolute; width: 24px; height: 24px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.2s; }
+.toggle-section input[type="checkbox"]:checked::before { transform: translateX(22px); }
+#processing { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 100; font-size: 16px; backdrop-filter: blur(5px); }
+#text-modal { position: fixed; bottom: calc(var(--safe-bottom) + 20px); left: 20px; right: 20px; background: #1c1c1e; padding: 20px; border-radius: 16px; display: none; flex-direction: column; gap: 12px; z-index: 60; }
+#text-modal input { width: 100%; padding: 14px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-size: 16px; }
+#text-modal .modal-buttons { display: flex; gap: 12px; }
+#text-modal .modal-buttons button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 16px; cursor: pointer; }
+#gallery-overlay { position: fixed; inset: 0; background: #000; z-index: 100; display: none; flex-direction: column; padding: var(--safe-top) 0 var(--safe-bottom) 0; }
+#gallery-header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+#gallery-content { flex: 1; overflow-y: auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+#gallery-content img { width: 100%; border-radius: 8px; aspect-ratio: 3/4; object-fit: cover; }
+#camera-selector { position: fixed; bottom: calc(var(--safe-bottom) + 120px); left: 20px; background: rgba(0,0,0,0.8); border-radius: 12px; padding: 12px; display: none; flex-direction: column; gap: 8px; backdrop-filter: blur(10px); z-index: 15; }
+.camera-option { padding: 10px 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px; cursor: pointer; min-width: 150px; }
   </style>
 </head>
 <body>
 
-<!-- Viewfinder -->
 <div id="viewfinder-container">
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas"></canvas>
   <img id="photo">
 </div>
 
-<!-- Top Bar -->
 <div id="top-bar">
   <button id="camera-switch">📷</button>
   <button id="gallery-btn">Gallery</button>
 </div>
 
-<!-- Bottom Controls -->
+<div id="gif-status">Recording GIF...</div>
+
 <div id="bottom-controls">
   <button id="menu-trigger">☰</button>
+  <button id="gif-btn" title="Record GIF (no effects)">GIF</button>
   <button id="shutter"></button>
   <button id="save-btn">💾</button>
   <button id="next-btn">↩</button>
   <button id="text-btn">T</button>
 </div>
 
-<!-- Bottom Sheet -->
 <div id="bottom-sheet">
   <div id="sheet-handle"></div>
   <div id="sheet-title">Film Controls</div>
-  
   <div id="tabs">
     <button class="tab active" data-tab="presets">Presets</button>
     <button class="tab" data-tab="effects">Effects</button>
-    <button class="tab" data-tab="colors">Colors</button>
   </div>
-  
   <div id="tab-content">
-    <!-- PRESETS TAB -->
     <div class="tab-panel active" id="presets-panel">
       <div id="preset-grid">
-        <div class="preset-card active" data-preset="kodachrome">
-          <div class="preset-name">Kodachrome</div>
-          <div class="preset-desc">Classic warm</div>
-        </div>
-        <div class="preset-card" data-preset="acros">
-          <div class="preset-name">Acros</div>
-          <div class="preset-desc">B&W film</div>
-        </div>
-        <div class="preset-card" data-preset="velvia">
-          <div class="preset-name">Velvia</div>
-          <div class="preset-desc">Vibrant colors</div>
-        </div>
-        <div class="preset-card" data-preset="provia">
-          <div class="preset-name">Provia</div>
-          <div class="preset-desc">Natural tones</div>
-        </div>
+        <div class="preset-card active" data-preset="kodachrome"><div class="preset-name">Kodachrome</div><div class="preset-desc">Classic warm</div></div>
+        <div class="preset-card" data-preset="acros"><div class="preset-name">Acros</div><div class="preset-desc">B&W film</div></div>
+        <div class="preset-card" data-preset="velvia"><div class="preset-name">Velvia</div><div class="preset-desc">Vibrant colors</div></div>
+        <div class="preset-card" data-preset="provia"><div class="preset-name">Provia</div><div class="preset-desc">Natural tones</div></div>
       </div>
-      
       <div class="divider"></div>
-      
       <div id="custom-profiles"></div>
-      
       <button class="btn-secondary" id="save-profile-btn">Save Current as Profile</button>
-      <button class="btn-secondary" id="import-preset-btn">Import Shared Preset</button>
     </div>
-    
-    <!-- EFFECTS TAB -->
     <div class="tab-panel" id="effects-panel">
-      <div class="control-group">
-        <div class="control-label">
-          <span>Exposure</span>
-          <span class="control-value" id="exposure-val">0</span>
-        </div>
-        <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0">
-      </div>
-      
+      <div class="control-group"><div class="control-label"><span>Exposure</span><span class="control-value" id="exposure-val">0</span></div><input type="range" id="exposure" min="-2" max="2" step="0.1" value="0"></div>
       <div class="divider"></div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>Highlight</span>
-          <span class="control-value" id="highlight-val">0</span>
-        </div>
-        <input type="range" id="highlight" min="-2" max="2" step="0.1" value="0">
-      </div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>Shadow</span>
-          <span class="control-value" id="shadow-val">0</span>
-        </div>
-        <input type="range" id="shadow" min="-2" max="2" step="0.1" value="0">
-      </div>
-      
+      <div class="control-group"><div class="control-label"><span>Film Grain</span><span class="control-value" id="grain-val">0</span></div><input type="range" id="grain" min="0" max="50" value="0"></div>
       <div class="divider"></div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>Film Grain Amount</span>
-          <span class="control-value" id="grain-val">0</span>
-        </div>
-        <input type="range" id="grain" min="0" max="50" value="0">
-      </div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>Film Grain Size</span>
-          <span class="control-value" id="grain-size-val">Medium</span>
-        </div>
-        <input type="range" id="grain-size" min="1" max="3" step="1" value="2">
-      </div>
-      
+      <div class="control-group"><div class="control-label"><span>Vignette</span><span class="control-value" id="vig-val">0</span></div><input type="range" id="vignette" min="0" max="100" value="0"></div>
       <div class="divider"></div>
-      
-      <div class="control-group">
-        <label for="color-chrome" style="font-size: 13px; color: rgba(255,255,255,0.8); margin-bottom: 8px; display: block;">Color Chrome Effect</label>
-        <select id="color-chrome">
-          <option value="0">Off</option>
-          <option value="1">Weak</option>
-          <option value="2">Strong</option>
-        </select>
-      </div>
-      
-      <div class="control-group">
-        <label for="color-chrome-blue" style="font-size: 13px; color: rgba(255,255,255,0.8); margin-bottom: 8px; display: block;">Color Chrome FX Blue</label>
-        <select id="color-chrome-blue">
-          <option value="0">Off</option>
-          <option value="1">Weak</option>
-          <option value="2">Strong</option>
-        </select>
-      </div>
-      
-      <div class="divider"></div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>JPEG Quality</span>
-          <span class="control-value" id="jpeg-quality-val">60%</span>
-        </div>
-        <input type="range" id="jpeg-quality" min="20" max="100" value="60">
-      </div>
-      
-      <div class="divider"></div>
-      
-      <div class="toggle-section">
-        <input type="checkbox" id="halation-enable">
-        <label for="halation-enable">Halation Effect</label>
-      </div>
-      
-      <div id="halation-wrapper" style="display:none">
-        <div class="control-group">
-          <div class="control-label">
-            <span>Spread</span>
-            <span class="control-value" id="halation-blur-val">10</span>
-          </div>
-          <input type="range" id="halation-blur" min="0" max="50" value="10">
-        </div>
-        
-        <div class="control-group">
-          <div class="control-label">
-            <span>Strength</span>
-            <span class="control-value" id="halation-strength-val">50</span>
-          </div>
-          <input type="range" id="halation-strength" min="0" max="100" value="50">
-        </div>
-        
-        <div class="control-group">
-          <div class="control-label">
-            <span>Threshold</span>
-            <span class="control-value" id="halation-threshold-val">200</span>
-          </div>
-          <input type="range" id="halation-threshold" min="0" max="255" value="200">
-        </div>
-      </div>
-      
-      <div class="divider"></div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>White Balance - Red</span>
-          <span class="control-value" id="wb-r-val">0</span>
-        </div>
-        <input type="range" id="wb-r" min="-10" max="10" value="0">
-      </div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>White Balance - Green</span>
-          <span class="control-value" id="wb-g-val">0</span>
-        </div>
-        <input type="range" id="wb-g" min="-10" max="10" value="0">
-      </div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>White Balance - Blue</span>
-          <span class="control-value" id="wb-b-val">0</span>
-        </div>
-        <input type="range" id="wb-b" min="-10" max="10" value="0">
-      </div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>Vignette Intensity</span>
-          <span class="control-value" id="vig-val">0</span>
-        </div>
-        <input type="range" id="vignette" min="0" max="100" value="0">
-      </div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>Vignette Size</span>
-          <span class="control-value" id="vig-size-val">0.7</span>
-        </div>
-        <input type="range" id="vignette-size" min="0.3" max="1.2" step="0.05" value="0.7">
-      </div>
-      
-      <div class="control-group">
-        <div class="control-label">
-          <span>Vignette Feather</span>
-          <span class="control-value" id="vig-feather-val">2.0</span>
-        </div>
-        <input type="range" id="vignette-feather" min="1" max="6" step="0.5" value="2.0">
-      </div>
-    </div>
-    
-    <!-- COLORS TAB -->
-    <div class="tab-panel" id="colors-panel">
-      <div class="toggle-section">
-        <input type="checkbox" id="cm-enable">
-        <label for="cm-enable">Per-Color Adjustments</label>
-      </div>
-      
-      <div id="cm-wrapper" style="display:none">
-        <div class="color-palette" id="color-palette"></div>
-        
-        <div class="color-info" id="color-info">Select a color to adjust</div>
-        
-        <div class="control-group">
-          <div class="control-label">
-            <span>Hue Shift</span>
-            <span class="control-value" id="cm-h-val">0°</span>
-          </div>
-          <input type="range" id="cm-h" min="-30" max="30" value="0">
-        </div>
-        
-        <div class="control-group">
-          <div class="control-label">
-            <span>Saturation</span>
-            <span class="control-value" id="cm-s-val">0</span>
-          </div>
-          <input type="range" id="cm-s" min="-100" max="100" value="0">
-        </div>
-        
-        <div class="control-group">
-          <div class="control-label">
-            <span>Luminance</span>
-            <span class="control-value" id="cm-l-val">0</span>
-          </div>
-          <input type="range" id="cm-l" min="-100" max="100" value="0">
-        </div>
-        
-        <button class="btn-secondary" id="cm-reset">Reset All Colors</button>
-      </div>
-      
-      <div class="divider"></div>
-      
-      <div class="toggle-section">
-        <input type="checkbox" id="tricolor-enable">
-        <label for="tricolor-enable">Tricolor Wheel</label>
-      </div>
-      
-      <div id="tricolor-wrapper" style="display:none">
-        <div class="tricolor-section">
-          <div class="tricolor-label">Shadows</div>
-          <div class="hue-wheel" id="shadow-wheel"></div>
-          <div class="control-group">
-            <div class="control-label">
-              <span>Hue</span>
-              <span class="control-value" id="shadow-hue-val">180°</span>
-            </div>
-            <input type="range" id="shadow-hue" min="0" max="360" value="180">
-          </div>
-          <div class="control-group">
-            <div class="control-label">
-              <span>Strength</span>
-              <span class="control-value" id="shadow-str-val">0%</span>
-            </div>
-            <input type="range" id="shadow-strength" min="0" max="100" value="0">
-          </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="tricolor-section">
-          <div class="tricolor-label">Midtones</div>
-          <div class="hue-wheel" id="midtone-wheel"></div>
-          <div class="control-group">
-            <div class="control-label">
-              <span>Hue</span>
-              <span class="control-value" id="midtone-hue-val">180°</span>
-            </div>
-            <input type="range" id="midtone-hue" min="0" max="360" value="180">
-          </div>
-          <div class="control-group">
-            <div class="control-label">
-              <span>Strength</span>
-              <span class="control-value" id="midtone-str-val">0%</span>
-            </div>
-            <input type="range" id="midtone-strength" min="0" max="100" value="0">
-          </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="tricolor-section">
-          <div class="tricolor-label">Highlights</div>
-          <div class="hue-wheel" id="highlight-wheel"></div>
-          <div class="control-group">
-            <div class="control-label">
-              <span>Hue</span>
-              <span class="control-value" id="highlight-hue-val">180°</span>
-            </div>
-            <input type="range" id="highlight-hue" min="0" max="360" value="180">
-          </div>
-          <div class="control-group">
-            <div class="control-label">
-              <span>Strength</span>
-              <span class="control-value" id="highlight-str-val">0%</span>
-            </div>
-            <input type="range" id="highlight-strength" min="0" max="100" value="0">
-          </div>
-        </div>
-        
-        <button class="btn-secondary" id="tricolor-reset">Reset Tricolor</button>
-      </div>
+      <div class="control-group"><div class="control-label"><span>JPEG Quality</span><span class="control-value" id="jpeg-quality-val">60%</span></div><input type="range" id="jpeg-quality" min="20" max="100" value="60"></div>
     </div>
   </div>
 </div>
 
-<!-- Camera Selector -->
 <div id="camera-selector"></div>
-
-<!-- Text Modal -->
 <div id="text-modal">
-  <input type="text" id="text-input" maxlength="50" placeholder="Enter text for photo" style="font-size: 14px;">
+  <input type="text" id="text-input" maxlength="50" placeholder="Enter text for photo">
   <div class="modal-buttons">
-    <button id="text-cancel" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; padding: 10px;">Cancel</button>
-    <button id="text-submit" style="background: #007aff; color: #fff; font-size: 14px; padding: 10px;">Add Text</button>
+    <button id="text-cancel" style="background: rgba(255,255,255,0.1); color: #fff;">Cancel</button>
+    <button id="text-submit" style="background: #007aff; color: #fff;">Add Text</button>
   </div>
 </div>
-
-<!-- Gallery -->
 <div id="gallery-overlay">
   <div id="gallery-header">
     <h2 style="font-size: 18px; font-weight: 600;">Gallery</h2>
@@ -1028,129 +140,69 @@ select {
   </div>
   <div id="gallery-content"></div>
 </div>
-
-<!-- Processing -->
-<div id="processing">
-  <div style="text-align: center;">
-    <div style="font-size: 16px; margin-bottom: 8px;">Processing...</div>
-    <div style="font-size: 13px; opacity: 0.7;">Applying film simulation</div>
-  </div>
-</div>
-
+<div id="processing"><div style="text-align: center;"><div style="font-size: 16px; margin-bottom: 8px;">Processing...</div><div style="font-size: 13px; opacity: 0.7;" id="processing-text">Applying film simulation</div></div></div>
 <select id="cameraSelect" style="display:none"></select>
 
 <script>
-/* ========== DOM REFS ========== */
+const GIF_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
-const photo = document.getElementById('photo');
 const shutter = document.getElementById('shutter');
 const saveBtn = document.getElementById('save-btn');
 const nextBtn = document.getElementById('next-btn');
 const textBtn = document.getElementById('text-btn');
+const gifBtn = document.getElementById('gif-btn');
+const gifStatus = document.getElementById('gif-status');
 const processingEl = document.getElementById('processing');
+const processingText = document.getElementById('processing-text');
 const cameraSelect = document.getElementById('cameraSelect');
 const bottomSheet = document.getElementById('bottom-sheet');
 const menuTrigger = document.getElementById('menu-trigger');
-const sheetHandle = document.getElementById('sheet-handle');
 
-/* ========== STATE ========== */
-let stream = null;
-let grainAmt = 0;
-let grainSize = 2; // 1=small, 2=medium, 3=large
-let film = 'kodachrome';
-let jpegQ = 60;
-let userText = '';
-let dim = null;
-let lastFrameImageData = null;
-let activeProfileName = null;
+let stream = null, grainAmt = 0, film = 'kodachrome', jpegQ = 60, userText = '', dim = null, lastFrameImageData = null;
+let exposureComp = 0, vignetteAmt = 0;
+let gifRecording = false, gifFrames = [];
+const GIF_FRAME_COUNT = 20, GIF_FRAME_DELAY = 100;
 
-let exposureComp = 0;
-let highlightAdj = 0;
-let shadowAdj = 0;
-let colorChrome = 0; // 0=off, 1=weak, 2=strong
-let colorChromeBlue = 0; // 0=off, 1=weak, 2=strong
+// GIF Recording
+gifBtn.addEventListener('click', () => { gifRecording ? stopGifRecording() : startGifRecording(); });
 
-const PROFILE_KEY = 'filmProfilesV1';
-let profiles = {};
+function startGifRecording() {
+  if (!video.videoWidth) { alert('Wait for camera'); return; }
+  gifRecording = true; gifFrames = [];
+  gifBtn.classList.add('recording'); gifBtn.textContent = '⏹';
+  gifStatus.classList.add('visible');
+  let frameCount = 0;
+  const interval = setInterval(() => {
+    if (!gifRecording || frameCount >= GIF_FRAME_COUNT) { clearInterval(interval); if (gifRecording) stopGifRecording(); return; }
+    const tmp = document.createElement('canvas');
+    tmp.width = video.videoWidth * 0.5; tmp.height = video.videoHeight * 0.5;
+    tmp.getContext('2d').drawImage(video, 0, 0, tmp.width, tmp.height);
+    gifFrames.push(tmp);
+    frameCount++;
+    gifStatus.textContent = `Recording... ${frameCount}/${GIF_FRAME_COUNT}`;
+  }, GIF_FRAME_DELAY);
+}
 
-const colors = [
-  {name:'Red', css:'#ff3b30', center:0.00},
-  {name:'Orange', css:'#ff9500', center:0.06},
-  {name:'Yellow', css:'#ffcc00', center:0.12},
-  {name:'Green', css:'#34c759', center:0.33},
-  {name:'Aqua', css:'#32d7d7', center:0.50},
-  {name:'Blue', css:'#007aff', center:0.62},
-  {name:'Purple', css:'#9b59ff', center:0.75},
-  {name:'Magenta', css:'#ff2d7a', center:0.88},
-];
-const hueWidth = [0.09,0.10,0.08,0.07,0.06,0.07,0.07,0.08];
-let cmIdx = 0;
+function stopGifRecording() {
+  gifRecording = false;
+  gifBtn.classList.remove('recording'); gifBtn.textContent = 'GIF';
+  gifStatus.classList.remove('visible');
+  if (gifFrames.length < 2) { alert('Not enough frames'); return; }
+  processingEl.style.display = 'flex'; processingText.textContent = 'Creating GIF...';
+  const gif = new GIF({ workers: 2, quality: 10, width: gifFrames[0].width, height: gifFrames[0].height, workerScript: GIF_WORKER_URL });
+  gifFrames.forEach(f => gif.addFrame(f, { delay: 100, copy: true }));
+  gif.on('finished', blob => {
+    processingEl.style.display = 'none';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `gif-${Date.now()}.gif`; a.click();
+    const reader = new FileReader(); reader.onloadend = () => localStorage.setItem(`saved-gif-${Date.now()}`, reader.result); reader.readAsDataURL(blob);
+    gifFrames = [];
+  });
+  gif.on('progress', p => { processingText.textContent = `Creating GIF... ${Math.round(p * 100)}%`; });
+  gif.render();
+}
 
-const CM_KEY = 'colorMixSettingsV1';
-let cmState = { enable:false, dH:new Array(8).fill(0), dS:new Array(8).fill(0), dL:new Array(8).fill(0) };
-
-const WB_KEY = 'wbSettingsV1';
-let wb = { r:0, g:0, b:0 };
-let vignetteAmt = 0;
-let vignetteSize = 0.7;
-let vignetteFeather = 2.0;
-
-/* ========== TRICOLOR WHEEL STATE ========== */
-const TRICOLOR_KEY = 'tricolorSettingsV1';
-let tricolorState = {
-  enable: false,
-  shadow: { hue: 180, strength: 0 },
-  midtone: { hue: 180, strength: 0 },
-  highlight: { hue: 180, strength: 0 }
-};
-
-/* ========== HALATION STATE ========== */
-const HALATION_KEY = 'halationSettingsV1';
-let halationState = {
-  enable: false,
-  blur: 10,
-  strength: 50,
-  threshold: 200
-};
-
-/* ========== LOAD SAVED SETTINGS ========== */
-try {
-  const saved = JSON.parse(localStorage.getItem(CM_KEY));
-  if (saved && Array.isArray(saved.dH)) cmState = saved;
-} catch {}
-
-try {
-  const savedWB = JSON.parse(localStorage.getItem(WB_KEY));
-  if (savedWB) wb = savedWB;
-} catch {}
-
-try {
-  const savedVig = +localStorage.getItem('vignetteAmtV1');
-  if (!isNaN(savedVig)) vignetteAmt = savedVig;
-} catch {}
-
-try {
-  const savedVigSize = +localStorage.getItem('vignetteSizeV1');
-  if (!isNaN(savedVigSize)) vignetteSize = savedVigSize;
-} catch {}
-
-try {
-  const savedVigFeather = +localStorage.getItem('vignetteFeatherV1');
-  if (!isNaN(savedVigFeather)) vignetteFeather = savedVigFeather;
-} catch {}
-
-try {
-  const savedTricolor = JSON.parse(localStorage.getItem(TRICOLOR_KEY));
-  if (savedTricolor) tricolorState = savedTricolor;
-} catch {}
-
-try {
-  const savedHalation = JSON.parse(localStorage.getItem(HALATION_KEY));
-  if (savedHalation) halationState = savedHalation;
-} catch {}
-
-/* ========== TABS ========== */
+// Tabs
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1160,1724 +212,168 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-/* ========== BOTTOM SHEET INTERACTION ========== */
+// Bottom sheet
 let sheetExpanded = false;
-let touchStartY = 0;
-let sheetStartY = 0;
+menuTrigger.addEventListener('click', e => { e.stopPropagation(); sheetExpanded = !sheetExpanded; bottomSheet.classList.toggle('expanded', sheetExpanded); });
+document.addEventListener('click', e => { if (sheetExpanded && !bottomSheet.contains(e.target) && e.target !== menuTrigger) { sheetExpanded = false; bottomSheet.classList.remove('expanded'); } });
 
-menuTrigger.addEventListener('click', (e) => {
-  e.stopPropagation();
-  sheetExpanded = !sheetExpanded;
-  bottomSheet.classList.toggle('expanded', sheetExpanded);
-});
-
-// Close bottom sheet when clicking outside
-document.addEventListener('click', (e) => {
-  if (sheetExpanded && 
-      !bottomSheet.contains(e.target) && 
-      e.target !== menuTrigger) {
-    sheetExpanded = false;
-    bottomSheet.classList.remove('expanded');
-  }
-});
-
-// Prevent clicks inside bottom sheet from closing it
-bottomSheet.addEventListener('click', (e) => {
-  e.stopPropagation();
-});
-
-sheetHandle.addEventListener('touchstart', (e) => {
-  touchStartY = e.touches[0].clientY;
-  sheetStartY = bottomSheet.getBoundingClientRect().top;
-}, { passive: true });
-
-sheetHandle.addEventListener('touchmove', (e) => {
-  const deltaY = e.touches[0].clientY - touchStartY;
-  if (deltaY > 0 && sheetExpanded) {
-    bottomSheet.style.transform = `translateY(${deltaY}px)`;
-  }
-}, { passive: true });
-
-sheetHandle.addEventListener('touchend', (e) => {
-  const deltaY = e.changedTouches[0].clientY - touchStartY;
-  bottomSheet.style.transform = '';
-  if (deltaY > 100) {
-    sheetExpanded = false;
-    bottomSheet.classList.remove('expanded');
-  }
-});
-
-/* ========== PRESETS ========== */
+// Presets
 document.querySelectorAll('.preset-card').forEach(card => {
   card.addEventListener('click', () => {
     document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
-    card.classList.add('active');
-    film = card.dataset.preset;
-    activeProfileName = null;
+    card.classList.add('active'); film = card.dataset.preset;
     if (lastFrameImageData) shootReprocess();
   });
 });
-
-/* ========== SLIDERS ========== */
-const exposureSlider = document.getElementById('exposure');
-const exposureVal = document.getElementById('exposure-val');
-exposureSlider.addEventListener('input', () => {
-  exposureComp = +exposureSlider.value;
-  exposureVal.textContent = exposureComp > 0 ? '+' + exposureComp.toFixed(1) : exposureComp.toFixed(1);
-  if (lastFrameImageData) shootReprocess();
-});
-
-const highlightSlider = document.getElementById('highlight');
-const highlightVal = document.getElementById('highlight-val');
-highlightSlider.addEventListener('input', () => {
-  highlightAdj = +highlightSlider.value;
-  highlightVal.textContent = highlightAdj > 0 ? '+' + highlightAdj.toFixed(1) : highlightAdj.toFixed(1);
-  if (lastFrameImageData) shootReprocess();
-});
-
-const shadowSlider = document.getElementById('shadow');
-const shadowVal = document.getElementById('shadow-val');
-shadowSlider.addEventListener('input', () => {
-  shadowAdj = +shadowSlider.value;
-  shadowVal.textContent = shadowAdj > 0 ? '+' + shadowAdj.toFixed(1) : shadowAdj.toFixed(1);
-  if (lastFrameImageData) shootReprocess();
-});
-
-const grainSlider = document.getElementById('grain');
-const grainVal = document.getElementById('grain-val');
-grainSlider.addEventListener('input', () => {
-  grainAmt = +grainSlider.value;
-  grainVal.textContent = grainAmt;
-  if (lastFrameImageData) shootReprocess();
-});
-
-const grainSizeSlider = document.getElementById('grain-size');
-const grainSizeVal = document.getElementById('grain-size-val');
-grainSizeSlider.addEventListener('input', () => {
-  grainSize = +grainSizeSlider.value;
-  const labels = ['', 'Small', 'Medium', 'Large'];
-  grainSizeVal.textContent = labels[grainSize];
-  if (lastFrameImageData) shootReprocess();
-});
-
-const colorChromeSelect = document.getElementById('color-chrome');
-colorChromeSelect.addEventListener('change', () => {
-  colorChrome = +colorChromeSelect.value;
-  if (lastFrameImageData) shootReprocess();
-});
-
-const colorChromeBlueSelect = document.getElementById('color-chrome-blue');
-colorChromeBlueSelect.addEventListener('change', () => {
-  colorChromeBlue = +colorChromeBlueSelect.value;
-  if (lastFrameImageData) shootReprocess();
-});
-
-const jpegSlider = document.getElementById('jpeg-quality');
-const jpegVal = document.getElementById('jpeg-quality-val');
-jpegSlider.addEventListener('input', () => {
-  jpegQ = +jpegSlider.value;
-  jpegVal.textContent = jpegQ + '%';
-});
-
-const wbRSlider = document.getElementById('wb-r');
-const wbRVal = document.getElementById('wb-r-val');
-wbRSlider.addEventListener('input', () => {
-  wb.r = +wbRSlider.value;
-  wbRVal.textContent = wb.r;
-  localStorage.setItem(WB_KEY, JSON.stringify(wb));
-  if (lastFrameImageData) shootReprocess();
-});
-
-const wbGSlider = document.getElementById('wb-g');
-const wbGVal = document.getElementById('wb-g-val');
-wbGSlider.addEventListener('input', () => {
-  wb.g = +wbGSlider.value;
-  wbGVal.textContent = wb.g;
-  localStorage.setItem(WB_KEY, JSON.stringify(wb));
-  if (lastFrameImageData) shootReprocess();
-});
-
-const wbBSlider = document.getElementById('wb-b');
-const wbBVal = document.getElementById('wb-b-val');
-wbBSlider.addEventListener('input', () => {
-  wb.b = +wbBSlider.value;
-  wbBVal.textContent = wb.b;
-  localStorage.setItem(WB_KEY, JSON.stringify(wb));
-  if (lastFrameImageData) shootReprocess();
-});
-
-const vignetteSlider = document.getElementById('vignette');
-const vigVal = document.getElementById('vig-val');
-vignetteSlider.addEventListener('input', () => {
-  vignetteAmt = +vignetteSlider.value;
-  vigVal.textContent = vignetteAmt;
-  localStorage.setItem('vignetteAmtV1', String(vignetteAmt));
-  if (lastFrameImageData) shootReprocess();
-});
-
-const vignetteSizeSlider = document.getElementById('vignette-size');
-const vigSizeVal = document.getElementById('vig-size-val');
-vignetteSizeSlider.addEventListener('input', () => {
-  vignetteSize = +vignetteSizeSlider.value;
-  vigSizeVal.textContent = vignetteSize.toFixed(2);
-  localStorage.setItem('vignetteSizeV1', String(vignetteSize));
-  if (lastFrameImageData) shootReprocess();
-});
-
-const vignetteFeatherSlider = document.getElementById('vignette-feather');
-const vigFeatherVal = document.getElementById('vig-feather-val');
-vignetteFeatherSlider.addEventListener('input', () => {
-  vignetteFeather = +vignetteFeatherSlider.value;
-  vigFeatherVal.textContent = vignetteFeather.toFixed(1);
-  localStorage.setItem('vignetteFeatherV1', String(vignetteFeather));
-  if (lastFrameImageData) shootReprocess();
-});
-
-// Initialize slider displays
-wbRVal.textContent = wb.r;
-wbGVal.textContent = wb.g;
-wbBVal.textContent = wb.b;
-vigVal.textContent = vignetteAmt;
-vigSizeVal.textContent = vignetteSize.toFixed(2);
-vigFeatherVal.textContent = vignetteFeather.toFixed(1);
-wbRSlider.value = wb.r;
-wbGSlider.value = wb.g;
-wbBSlider.value = wb.b;
-vignetteSlider.value = vignetteAmt;
-vignetteSizeSlider.value = vignetteSize;
-vignetteFeatherSlider.value = vignetteFeather;
-
-/* ========== HALATION ========== */
-const halationEnable = document.getElementById('halation-enable');
-const halationWrapper = document.getElementById('halation-wrapper');
-const halationBlur = document.getElementById('halation-blur');
-const halationStrength = document.getElementById('halation-strength');
-const halationThreshold = document.getElementById('halation-threshold');
-const halationBlurVal = document.getElementById('halation-blur-val');
-const halationStrengthVal = document.getElementById('halation-strength-val');
-const halationThresholdVal = document.getElementById('halation-threshold-val');
-
-function updateHalationUI() {
-  halationEnable.checked = halationState.enable;
-  halationWrapper.style.display = halationState.enable ? 'block' : 'none';
-  halationBlur.value = halationState.blur;
-  halationStrength.value = halationState.strength;
-  halationThreshold.value = halationState.threshold;
-  halationBlurVal.textContent = halationState.blur;
-  halationStrengthVal.textContent = halationState.strength;
-  halationThresholdVal.textContent = halationState.threshold;
-}
-
-function saveHalationState() {
-  localStorage.setItem(HALATION_KEY, JSON.stringify(halationState));
-}
-
-halationEnable.addEventListener('change', () => {
-  halationState.enable = halationEnable.checked;
-  halationWrapper.style.display = halationState.enable ? 'block' : 'none';
-  saveHalationState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-halationBlur.addEventListener('input', () => {
-  halationState.blur = +halationBlur.value;
-  halationBlurVal.textContent = halationState.blur;
-  saveHalationState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-halationStrength.addEventListener('input', () => {
-  halationState.strength = +halationStrength.value;
-  halationStrengthVal.textContent = halationState.strength;
-  saveHalationState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-halationThreshold.addEventListener('input', () => {
-  halationState.threshold = +halationThreshold.value;
-  halationThresholdVal.textContent = halationState.threshold;
-  saveHalationState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-updateHalationUI();
-
-/* ========== COLOR MIX ========== */
-const cmEnable = document.getElementById('cm-enable');
-const cmWrapper = document.getElementById('cm-wrapper');
-const colorPalette = document.getElementById('color-palette');
-const colorInfo = document.getElementById('color-info');
-const cmH = document.getElementById('cm-h');
-const cmS = document.getElementById('cm-s');
-const cmL = document.getElementById('cm-l');
-const cmHVal = document.getElementById('cm-h-val');
-const cmSVal = document.getElementById('cm-s-val');
-const cmLVal = document.getElementById('cm-l-val');
-const cmReset = document.getElementById('cm-reset');
-
-function buildColorPalette() {
-  colorPalette.innerHTML = '';
-  colors.forEach((c, i) => {
-    const chip = document.createElement('div');
-    chip.className = 'color-chip' + (i === cmIdx ? ' selected' : '');
-    chip.style.background = c.css;
-    chip.addEventListener('click', () => {
-      cmIdx = i;
-      buildColorPalette();
-      updateColorControls();
-    });
-    colorPalette.appendChild(chip);
-  });
-}
-
-function updateColorControls() {
-  colorInfo.textContent = `${colors[cmIdx].name} • Hue ${Math.round(cmState.dH[cmIdx]*360)}° • Sat ${Math.round(cmState.dS[cmIdx]*200)} • Lum ${Math.round(cmState.dL[cmIdx]*200)}`;
-  cmH.value = Math.round(cmState.dH[cmIdx] * 360);
-  cmS.value = Math.round(cmState.dS[cmIdx] * 200);
-  cmL.value = Math.round(cmState.dL[cmIdx] * 200);
-  cmHVal.textContent = cmH.value + '°';
-  cmSVal.textContent = cmS.value;
-  cmLVal.textContent = cmL.value;
-}
-
-cmH.addEventListener('input', () => {
-  cmState.dH[cmIdx] = (+cmH.value) / 360;
-  cmHVal.textContent = cmH.value + '°';
-  updateColorControls();
-  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
-  if (lastFrameImageData) shootReprocess();
-});
-
-cmS.addEventListener('input', () => {
-  cmState.dS[cmIdx] = (+cmS.value) / 200;
-  cmSVal.textContent = cmS.value;
-  updateColorControls();
-  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
-  if (lastFrameImageData) shootReprocess();
-});
-
-cmL.addEventListener('input', () => {
-  cmState.dL[cmIdx] = (+cmL.value) / 200;
-  cmLVal.textContent = cmL.value;
-  updateColorControls();
-  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
-  if (lastFrameImageData) shootReprocess();
-});
-
-cmReset.addEventListener('click', () => {
-  cmState.dH.fill(0);
-  cmState.dS.fill(0);
-  cmState.dL.fill(0);
-  updateColorControls();
-  buildColorPalette();
-  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
-  if (lastFrameImageData) shootReprocess();
-});
-
-cmEnable.checked = cmState.enable;
-cmWrapper.style.display = cmState.enable ? 'block' : 'none';
-buildColorPalette();
-updateColorControls();
-
-/* ========== TRICOLOR WHEEL ========== */
-const tricolorEnable = document.getElementById('tricolor-enable');
-const tricolorWrapper = document.getElementById('tricolor-wrapper');
 
 // Sliders
-const shadowHue = document.getElementById('shadow-hue');
-const shadowStr = document.getElementById('shadow-strength');
-const shadowHueVal = document.getElementById('shadow-hue-val');
-const shadowStrVal = document.getElementById('shadow-str-val');
+const exposureSlider = document.getElementById('exposure'), exposureVal = document.getElementById('exposure-val');
+exposureSlider.addEventListener('input', () => { exposureComp = +exposureSlider.value; exposureVal.textContent = exposureComp > 0 ? '+' + exposureComp.toFixed(1) : exposureComp.toFixed(1); if (lastFrameImageData) shootReprocess(); });
 
-const midtoneHue = document.getElementById('midtone-hue');
-const midtoneStr = document.getElementById('midtone-strength');
-const midtoneHueVal = document.getElementById('midtone-hue-val');
-const midtoneStrVal = document.getElementById('midtone-str-val');
+const grainSlider = document.getElementById('grain'), grainVal = document.getElementById('grain-val');
+grainSlider.addEventListener('input', () => { grainAmt = +grainSlider.value; grainVal.textContent = grainAmt; if (lastFrameImageData) shootReprocess(); });
 
-const highlightHue = document.getElementById('highlight-hue');
-const highlightStr = document.getElementById('highlight-strength');
-const highlightHueVal = document.getElementById('highlight-hue-val');
-const highlightStrVal = document.getElementById('highlight-str-val');
+const vignetteSlider = document.getElementById('vignette'), vigVal = document.getElementById('vig-val');
+vignetteSlider.addEventListener('input', () => { vignetteAmt = +vignetteSlider.value; vigVal.textContent = vignetteAmt; if (lastFrameImageData) shootReprocess(); });
 
-const tricolorReset = document.getElementById('tricolor-reset');
+const jpegSlider = document.getElementById('jpeg-quality'), jpegVal = document.getElementById('jpeg-quality-val');
+jpegSlider.addEventListener('input', () => { jpegQ = +jpegSlider.value; jpegVal.textContent = jpegQ + '%'; });
 
-// Color wheels
-const shadowWheel = document.getElementById('shadow-wheel');
-const midtoneWheel = document.getElementById('midtone-wheel');
-const highlightWheel = document.getElementById('highlight-wheel');
-
-function updateTricolorUI() {
-  tricolorEnable.checked = tricolorState.enable;
-  tricolorWrapper.style.display = tricolorState.enable ? 'block' : 'none';
-  
-  // Update shadow
-  shadowHue.value = tricolorState.shadow.hue;
-  shadowStr.value = tricolorState.shadow.strength;
-  shadowHueVal.textContent = tricolorState.shadow.hue + '°';
-  shadowStrVal.textContent = tricolorState.shadow.strength + '%';
-  updateWheelIndicator(shadowWheel, tricolorState.shadow.hue);
-  
-  // Update midtone
-  midtoneHue.value = tricolorState.midtone.hue;
-  midtoneStr.value = tricolorState.midtone.strength;
-  midtoneHueVal.textContent = tricolorState.midtone.hue + '°';
-  midtoneStrVal.textContent = tricolorState.midtone.strength + '%';
-  updateWheelIndicator(midtoneWheel, tricolorState.midtone.hue);
-  
-  // Update highlight
-  highlightHue.value = tricolorState.highlight.hue;
-  highlightStr.value = tricolorState.highlight.strength;
-  highlightHueVal.textContent = tricolorState.highlight.hue + '°';
-  highlightStrVal.textContent = tricolorState.highlight.strength + '%';
-  updateWheelIndicator(highlightWheel, tricolorState.highlight.hue);
-}
-
-function updateWheelIndicator(wheel, hue) {
-  const percent = (hue / 360) * 100;
-  wheel.style.setProperty('--indicator-left', percent + '%');
-}
-
-function saveTricolorState() {
-  localStorage.setItem(TRICOLOR_KEY, JSON.stringify(tricolorState));
-}
-
-// Mutual exclusivity
-tricolorEnable.addEventListener('change', () => {
-  tricolorState.enable = tricolorEnable.checked;
-  if (tricolorState.enable) {
-    cmState.enable = false;
-    cmEnable.checked = false;
-    cmWrapper.style.display = 'none';
-  }
-  tricolorWrapper.style.display = tricolorState.enable ? 'block' : 'none';
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-cmEnable.addEventListener('change', () => {
-  cmState.enable = cmEnable.checked;
-  if (cmState.enable) {
-    tricolorState.enable = false;
-    tricolorEnable.checked = false;
-    tricolorWrapper.style.display = 'none';
-  }
-  cmWrapper.style.display = cmState.enable ? 'block' : 'none';
-  localStorage.setItem(CM_KEY, JSON.stringify(cmState));
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-// Shadow controls
-shadowHue.addEventListener('input', () => {
-  tricolorState.shadow.hue = +shadowHue.value;
-  shadowHueVal.textContent = tricolorState.shadow.hue + '°';
-  updateWheelIndicator(shadowWheel, tricolorState.shadow.hue);
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-shadowStr.addEventListener('input', () => {
-  tricolorState.shadow.strength = +shadowStr.value;
-  shadowStrVal.textContent = tricolorState.shadow.strength + '%';
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-// Midtone controls
-midtoneHue.addEventListener('input', () => {
-  tricolorState.midtone.hue = +midtoneHue.value;
-  midtoneHueVal.textContent = tricolorState.midtone.hue + '°';
-  updateWheelIndicator(midtoneWheel, tricolorState.midtone.hue);
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-midtoneStr.addEventListener('input', () => {
-  tricolorState.midtone.strength = +midtoneStr.value;
-  midtoneStrVal.textContent = tricolorState.midtone.strength + '%';
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-// Highlight controls
-highlightHue.addEventListener('input', () => {
-  tricolorState.highlight.hue = +highlightHue.value;
-  highlightHueVal.textContent = tricolorState.highlight.hue + '°';
-  updateWheelIndicator(highlightWheel, tricolorState.highlight.hue);
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-highlightStr.addEventListener('input', () => {
-  tricolorState.highlight.strength = +highlightStr.value;
-  highlightStrVal.textContent = tricolorState.highlight.strength + '%';
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-// Wheel click handlers
-function handleWheelClick(wheel, type) {
-  wheel.addEventListener('click', (e) => {
-    const rect = wheel.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percent = x / rect.width;
-    const hue = Math.round(percent * 360);
-    
-    tricolorState[type].hue = hue;
-    
-    if (type === 'shadow') {
-      shadowHue.value = hue;
-      shadowHueVal.textContent = hue + '°';
-    } else if (type === 'midtone') {
-      midtoneHue.value = hue;
-      midtoneHueVal.textContent = hue + '°';
-    } else {
-      highlightHue.value = hue;
-      highlightHueVal.textContent = hue + '°';
-    }
-    
-    updateWheelIndicator(wheel, hue);
-    saveTricolorState();
-    if (lastFrameImageData) shootReprocess();
-  });
-}
-
-handleWheelClick(shadowWheel, 'shadow');
-handleWheelClick(midtoneWheel, 'midtone');
-handleWheelClick(highlightWheel, 'highlight');
-
-tricolorReset.addEventListener('click', () => {
-  tricolorState.shadow = { hue: 180, strength: 0 };
-  tricolorState.midtone = { hue: 180, strength: 0 };
-  tricolorState.highlight = { hue: 180, strength: 0 };
-  updateTricolorUI();
-  saveTricolorState();
-  if (lastFrameImageData) shootReprocess();
-});
-
-updateTricolorUI();
-
-/* ========== PROFILES ========== */
-function loadProfiles() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(PROFILE_KEY));
-    if (raw) profiles = raw;
-  } catch {}
-  renderProfiles();
-}
-
-function renderProfiles() {
-  const container = document.getElementById('custom-profiles');
-  container.innerHTML = '';
-  
-  Object.keys(profiles).forEach(name => {
-    const profile = profiles[name];
-    const isImported = profile._imported === true;
-    
-    const card = document.createElement('div');
-    card.className = 'preset-card';
-    
-    // Only add share button if NOT imported
-    const shareButtonHTML = isImported 
-      ? '' 
-      : '<button class="preset-share-btn" title="Share preset">📤</button>';
-    
-    const descText = isImported ? 'Received preset' : 'Custom profile';
-    
-    card.innerHTML = `
-      <button class="preset-delete-btn" title="Delete preset">🗑️</button>
-      ${shareButtonHTML}
-      <div class="preset-name">${name}</div>
-      <div class="preset-desc">${descText}</div>
-    `;
-    
-    // Click on card to load preset
-    card.addEventListener('click', (e) => {
-      // Don't trigger if clicking action buttons
-      if (e.target.classList.contains('preset-share-btn') || 
-          e.target.classList.contains('preset-delete-btn')) return;
-      
-      document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      activeProfileName = name;
-      applyProfile(name);
-    });
-    
-    // Delete button functionality
-    const deleteBtn = card.querySelector('.preset-delete-btn');
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deletePreset(name);
-    });
-    
-    // Share button functionality (only if not imported)
-    if (!isImported) {
-      const shareBtn = card.querySelector('.preset-share-btn');
-      if (shareBtn) {
-        shareBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await sharePreset(name);
-        });
-      }
-    }
-    
-    container.appendChild(card);
-  });
-}
-
-function applyProfile(name) {
-  const p = profiles[name];
-  if (!p) return;
-  
-  film = p.filmBase || 'kodachrome';
-  grainAmt = p.grainAmt || 0;
-  grainSize = p.grainSize || 2;
-  exposureComp = p.exposureComp || 0;
-  highlightAdj = p.highlightAdj || 0;
-  shadowAdj = p.shadowAdj || 0;
-  colorChrome = p.colorChrome || 0;
-  colorChromeBlue = p.colorChromeBlue || 0;
-  
-  grainSlider.value = grainAmt;
-  grainVal.textContent = grainAmt;
-  grainSizeSlider.value = grainSize;
-  const labels = ['', 'Small', 'Medium', 'Large'];
-  grainSizeVal.textContent = labels[grainSize];
-  
-  exposureSlider.value = exposureComp;
-  exposureVal.textContent = exposureComp > 0 ? '+' + exposureComp.toFixed(1) : exposureComp.toFixed(1);
-  
-  highlightSlider.value = highlightAdj;
-  highlightVal.textContent = highlightAdj > 0 ? '+' + highlightAdj.toFixed(1) : highlightAdj.toFixed(1);
-  
-  shadowSlider.value = shadowAdj;
-  shadowVal.textContent = shadowAdj > 0 ? '+' + shadowAdj.toFixed(1) : shadowAdj.toFixed(1);
-  
-  colorChromeSelect.value = colorChrome;
-  colorChromeBlueSelect.value = colorChromeBlue;
-  
-  if (p.cmState) {
-    cmState = JSON.parse(JSON.stringify(p.cmState));
-    cmEnable.checked = cmState.enable;
-    cmWrapper.style.display = cmState.enable ? 'block' : 'none';
-    updateColorControls();
-    buildColorPalette();
-    localStorage.setItem(CM_KEY, JSON.stringify(cmState));
-  }
-  
-  if (p.wb) {
-    wb = { r: p.wb.r || 0, g: p.wb.g || 0, b: p.wb.b || 0 };
-    wbRSlider.value = wb.r;
-    wbGSlider.value = wb.g;
-    wbBSlider.value = wb.b;
-    wbRVal.textContent = wb.r;
-    wbGVal.textContent = wb.g;
-    wbBVal.textContent = wb.b;
-    localStorage.setItem(WB_KEY, JSON.stringify(wb));
-  }
-  
-  if (typeof p.vignetteAmt === 'number') {
-    vignetteAmt = p.vignetteAmt;
-    vignetteSlider.value = vignetteAmt;
-    vigVal.textContent = vignetteAmt;
-    localStorage.setItem('vignetteAmtV1', String(vignetteAmt));
-  }
-  
-  if (typeof p.vignetteSize === 'number') {
-    vignetteSize = p.vignetteSize;
-    vignetteSizeSlider.value = vignetteSize;
-    vigSizeVal.textContent = vignetteSize.toFixed(2);
-    localStorage.setItem('vignetteSizeV1', String(vignetteSize));
-  }
-  
-  if (typeof p.vignetteFeather === 'number') {
-    vignetteFeather = p.vignetteFeather;
-    vignetteFeatherSlider.value = vignetteFeather;
-    vigFeatherVal.textContent = vignetteFeather.toFixed(1);
-    localStorage.setItem('vignetteFeatherV1', String(vignetteFeather));
-  }
-  
-  if (p.tricolorState) {
-    tricolorState = JSON.parse(JSON.stringify(p.tricolorState));
-    updateTricolorUI();
-    saveTricolorState();
-  }
-  
-  if (p.halationState) {
-    halationState = JSON.parse(JSON.stringify(p.halationState));
-    updateHalationUI();
-    saveHalationState();
-  }
-  
-  if (lastFrameImageData) shootReprocess();
-}
-
-/* ========== PRESET SHARING ========== */
-function deletePreset(presetName) {
-  if (!confirm(`Delete preset "${presetName}"?\n\nThis cannot be undone.`)) {
-    return;
-  }
-  
-  // Remove from profiles object
-  delete profiles[presetName];
-  
-  // Save to localStorage
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
-  
-  // If this was the active profile, clear it
-  if (activeProfileName === presetName) {
-    activeProfileName = null;
-  }
-  
-  // Refresh UI
-  renderProfiles();
-}
-
-async function sharePreset(presetName) {
-  const preset = profiles[presetName];
-  if (!preset) return;
-  
-  // Create shareable package
-  const sharePackage = {
-    v: 1, // version
-    n: presetName, // name
-    d: preset, // data
-    t: Date.now() // timestamp
-  };
-  
-  // Encode to base64
-  const jsonStr = JSON.stringify(sharePackage);
-  const encoded = btoa(encodeURIComponent(jsonStr));
-  
-  // Copy to clipboard
-  try {
-    await navigator.clipboard.writeText(encoded);
-    alert(`✅ Preset "${presetName}" copied to clipboard!\n\nShare this code with your friend.`);
-    
-    // Auto-clear clipboard after 60 seconds
-    setTimeout(async () => {
-      try {
-        const current = await navigator.clipboard.readText();
-        if (current === encoded) {
-          await navigator.clipboard.writeText('null');
-        }
-      } catch {}
-    }, 60000);
-  } catch (err) {
-    // Fallback: show in prompt
-    prompt('Copy this preset code:', encoded);
-  }
-}
-
-async function importPreset() {
-  let code = prompt('Paste the preset code you received:');
-  if (!code || code.trim() === '' || code.trim() === 'null') return;
-  
-  code = code.trim();
-  
-  try {
-    // Decode from base64
-    const jsonStr = decodeURIComponent(atob(code));
-    const sharePackage = JSON.parse(jsonStr);
-    
-    // Validate structure
-    if (!sharePackage.v || !sharePackage.n || !sharePackage.d) {
-      throw new Error('Invalid preset format');
-    }
-    
-    // Check if preset already exists
-    let finalName = sharePackage.n;
-    let counter = 1;
-    while (profiles[finalName]) {
-      finalName = `${sharePackage.n} (${counter})`;
-      counter++;
-    }
-    
-    // Mark as imported (non-shareable)
-    const importedPreset = sharePackage.d;
-    importedPreset._imported = true;
-    importedPreset._importedAt = Date.now();
-    
-    // Save as permanent preset
-    profiles[finalName] = importedPreset;
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
-    
-    // Refresh UI
-    renderProfiles();
-    
-    // Clear clipboard
-    try {
-      await navigator.clipboard.writeText('null');
-    } catch {}
-    
-    alert(`✅ Preset "${finalName}" imported successfully!`);
-    
-  } catch (err) {
-    alert('❌ Invalid preset code. Please check and try again.');
-  }
-}
-
-document.getElementById('save-profile-btn').addEventListener('click', () => {
-  const name = prompt('Profile name?');
-  if (!name) return;
-  
-  profiles[name] = {
-    filmBase: film,
-    grainAmt,
-    grainSize,
-    exposureComp,
-    highlightAdj,
-    shadowAdj,
-    colorChrome,
-    colorChromeBlue,
-    cmState: JSON.parse(JSON.stringify(cmState)),
-    wb: { ...wb },
-    vignetteAmt,
-    vignetteSize,
-    vignetteFeather,
-    tricolorState: JSON.parse(JSON.stringify(tricolorState)),
-    halationState: JSON.parse(JSON.stringify(halationState))
-  };
-  
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
-  renderProfiles();
-  alert('Profile saved: ' + name);
-});
-
-document.getElementById('import-preset-btn').addEventListener('click', () => {
-  importPreset();
-});
-
-/* ========== CAMERA ========== */
+// Camera
 async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
-  const c = { 
-    video: id 
-      ? { deviceId: {exact: id}, width: {ideal: 1920}, height: {ideal: 1080} }
-      : { facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080} }
-  };
-  
-  try {
-    stream = await navigator.mediaDevices.getUserMedia(c);
-    video.srcObject = stream;
-    await video.play();
-    await updateCameraList();
-  } catch (e) {
-    alert('Camera error: ' + e.message);
-  }
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id } } : { facingMode: { ideal: 'environment' } } }); video.srcObject = stream; await video.play(); await updateCameraList(); }
+  catch (e) { alert('Camera error: ' + e.message); }
 }
 
 async function updateCameraList() {
   const devices = await navigator.mediaDevices.enumerateDevices();
-  const cameras = devices.filter(d => d.kind === 'videoinput');
-  
   cameraSelect.innerHTML = '';
-  cameras.forEach((d, i) => {
-    const opt = document.createElement('option');
-    opt.value = d.deviceId;
-    opt.textContent = d.label || `Camera ${i+1}`;
-    cameraSelect.appendChild(opt);
-  });
+  devices.filter(d => d.kind === 'videoinput').forEach((d, i) => { const opt = document.createElement('option'); opt.value = d.deviceId; opt.textContent = d.label || `Camera ${i+1}`; cameraSelect.appendChild(opt); });
 }
 
 document.getElementById('camera-switch').addEventListener('click', () => {
   const selector = document.getElementById('camera-selector');
-  if (selector.style.display === 'flex') {
-    selector.style.display = 'none';
-    return;
-  }
-  
+  if (selector.style.display === 'flex') { selector.style.display = 'none'; return; }
   selector.innerHTML = '';
   Array.from(cameraSelect.options).forEach(opt => {
-    const btn = document.createElement('div');
-    btn.className = 'camera-option';
-    btn.textContent = opt.textContent;
-    btn.addEventListener('click', () => {
-      bootCam(opt.value);
-      selector.style.display = 'none';
-    });
+    const btn = document.createElement('div'); btn.className = 'camera-option'; btn.textContent = opt.textContent;
+    btn.addEventListener('click', () => { bootCam(opt.value); selector.style.display = 'none'; });
     selector.appendChild(btn);
   });
   selector.style.display = 'flex';
 });
 
-/* ========== WORKER ========== */
+// Worker
 const workerSrc = `
-self.onmessage = (e) => {
-  const { imageData, film, grainAmt, grainSize, exposureComp, highlightAdj, shadowAdj, colorChrome, colorChromeBlue, cmState, colors, hueWidth, wb, vignetteAmt, vignetteSize, vignetteFeather, tricolorState, halationState } = e.data;
-  const d = imageData.data;
-  const useColorMix = cmState.enable && film !== 'acros';
-  const useTricolor = tricolorState.enable && film !== 'acros';
-  const useHalation = halationState.enable;
-
-  // ========== IMPROVED COLOR SPACE CONVERSIONS ==========
-  
-  // RGB to XYZ (D65 illuminant)
-  function rgbToXyz(r, g, b) {
-    r = r / 255; g = g / 255; b = b / 255;
-    
-    // Gamma correction (sRGB)
-    r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-    g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-    b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-    
-    // Linear RGB to XYZ (D65)
-    const x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
-    const y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
-    const z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
-    
-    return [x * 100, y * 100, z * 100];
-  }
-  
-  // XYZ to LAB
-  function xyzToLab(x, y, z) {
-    // D65 reference white
-    x = x / 95.047;
-    y = y / 100.000;
-    z = z / 108.883;
-    
-    const fx = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x + 16/116);
-    const fy = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y + 16/116);
-    const fz = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z + 16/116);
-    
-    const L = (116 * fy) - 16;
-    const a = 500 * (fx - fy);
-    const b = 200 * (fy - fz);
-    
-    return [L, a, b];
-  }
-  
-  // LAB to LCH (Cylindrical LAB)
-  function labToLch(L, a, b) {
-    const C = Math.sqrt(a * a + b * b);
-    let H = Math.atan2(b, a) * (180 / Math.PI);
-    if (H < 0) H += 360;
-    return [L, C, H];
-  }
-  
-  // LCH to LAB
-  function lchToLab(L, C, H) {
-    const hRad = H * (Math.PI / 180);
-    const a = C * Math.cos(hRad);
-    const b = C * Math.sin(hRad);
-    return [L, a, b];
-  }
-  
-  // LAB to XYZ
-  function labToXyz(L, a, b) {
-    let fy = (L + 16) / 116;
-    let fx = a / 500 + fy;
-    let fz = fy - b / 200;
-    
-    const xr = fx * fx * fx > 0.008856 ? fx * fx * fx : (fx - 16/116) / 7.787;
-    const yr = fy * fy * fy > 0.008856 ? fy * fy * fy : (fy - 16/116) / 7.787;
-    const zr = fz * fz * fz > 0.008856 ? fz * fz * fz : (fz - 16/116) / 7.787;
-    
-    return [xr * 95.047, yr * 100.000, zr * 108.883];
-  }
-  
-  // XYZ to RGB
-  function xyzToRgb(x, y, z) {
-    x = x / 100; y = y / 100; z = z / 100;
-    
-    let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
-    let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
-    let b = x *  0.0556434 + y * -0.2040259 + z *  1.0572252;
-    
-    // Gamma correction (sRGB)
-    r = r > 0.0031308 ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r;
-    g = g > 0.0031308 ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g;
-    b = b > 0.0031308 ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b;
-    
-    return [
-      Math.max(0, Math.min(255, Math.round(r * 255))),
-      Math.max(0, Math.min(255, Math.round(g * 255))),
-      Math.max(0, Math.min(255, Math.round(b * 255)))
-    ];
-  }
-  
-  // Direct RGB to LCH (convenience)
-  function rgbToLch(r, g, b) {
-    const [x, y, z] = rgbToXyz(r, g, b);
-    const [L, a, bLab] = xyzToLab(x, y, z);
-    return labToLch(L, a, bLab);
-  }
-  
-  // Direct LCH to RGB (convenience)
-  function lchToRgb(L, C, H) {
-    const [l, a, b] = lchToLab(L, C, H);
-    const [x, y, z] = labToXyz(l, a, b);
-    return xyzToRgb(x, y, z);
-  }
-
-  // ========== IMPROVED COLOR ADJUSTMENT FUNCTIONS ==========
-  
-  // New color ranges (wider, non-overlapping)
-  const colorRanges = [
-    { name: 'Red',     center: 0,   width: 40 },   // 340-40°
-    { name: 'Yellow',  center: 60,  width: 40 },   // 40-100°
-    { name: 'Green',   center: 140, width: 60 },   // 100-180°
-    { name: 'Cyan',    center: 190, width: 20 },   // 180-200°
-    { name: 'Blue',    center: 240, width: 60 },   // 200-280°
-    { name: 'Magenta', center: 310, width: 40 }    // 280-340°
-  ];
-  
-  // Smooth gaussian-like weight function
-  function getColorWeight(hue, center, width) {
-    let delta = Math.abs(hue - center);
-    
-    // Handle hue wrapping
-    if (delta > 180) delta = 360 - delta;
-    
-    const halfWidth = width / 2;
-    if (delta > halfWidth) return 0;
-    
-    // Gaussian-like falloff
-    const normalized = delta / halfWidth;
-    return Math.exp(-2 * normalized * normalized);
-  }
-  
-  // Map old 8-color indices to new 6-color system
-  function getAdjustmentsForHue(hue, cmState) {
-    // Map old color system to new
-    const mapping = [0, 1, 1, 2, 3, 4, 5, 5]; // Red, Orange→Yellow, Yellow, Green, Aqua→Cyan, Blue, Purple→Magenta, Magenta
-    
-    let totalSat = 0, totalLum = 0, totalWeight = 0;
-    
-    for (let i = 0; i < colorRanges.length; i++) {
-      const range = colorRanges[i];
-      const weight = getColorWeight(hue, range.center, range.width);
-      
-      if (weight > 0.01) {
-        // Find which old color indices map to this range
-        const oldIndices = [];
-        for (let j = 0; j < mapping.length; j++) {
-          if (mapping[j] === i) oldIndices.push(j);
-        }
-        
-        // Average adjustments from mapped old colors
-        let avgS = 0, avgL = 0;
-        for (const idx of oldIndices) {
-          avgS += cmState.dS[idx] || 0;
-          avgL += cmState.dL[idx] || 0;
-        }
-        avgS /= oldIndices.length;
-        avgL /= oldIndices.length;
-        
-        totalSat += avgS * weight;
-        totalLum += avgL * weight;
-        totalWeight += weight;
-      }
-    }
-    
-    if (totalWeight > 0) {
-      return {
-        sat: totalSat / totalWeight,
-        lum: totalLum / totalWeight
-      };
-    }
-    
-    return { sat: 0, lum: 0 };
-  }
-
-  // ========== PERLIN NOISE FOR FILM GRAIN ==========
-  
-  // Perlin noise generator for structured film grain
-  function perlinNoise(x, y, scale, octaves) {
-    let value = 0;
-    let amplitude = 1;
-    let frequency = scale;
-    let maxValue = 0;
-    
-    for (let i = 0; i < octaves; i++) {
-      const sampleX = x * frequency;
-      const sampleY = y * frequency;
-      
-      // Grid coordinates
-      const x0 = Math.floor(sampleX);
-      const x1 = x0 + 1;
-      const y0 = Math.floor(sampleY);
-      const y1 = y0 + 1;
-      
-      // Interpolation weights
-      const sx = sampleX - x0;
-      const sy = sampleY - y0;
-      
-      // Gradient vectors (pseudo-random)
-      const hash = (x, y) => {
-        let h = x * 374761393 + y * 668265263;
-        h = (h ^ (h >>> 13)) * 1274126177;
-        return ((h ^ (h >>> 16)) & 0x7fffffff) / 0x7fffffff * 2 - 1;
-      };
-      
-      const g00 = hash(x0, y0);
-      const g10 = hash(x1, y0);
-      const g01 = hash(x0, y1);
-      const g11 = hash(x1, y1);
-      
-      // Interpolate
-      const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
-      const u = fade(sx);
-      const v = fade(sy);
-      
-      const nx0 = g00 * (1 - u) + g10 * u;
-      const nx1 = g01 * (1 - u) + g11 * u;
-      const nxy = nx0 * (1 - v) + nx1 * v;
-      
-      value += nxy * amplitude;
-      maxValue += amplitude;
-      
-      amplitude *= 0.5;
-      frequency *= 2;
-    }
-    
-    return value / maxValue;
-  }
-
-  const W = imageData.width, H = imageData.height;
-  const cx = W * 0.5, cy = H * 0.5;
-  
-  // Elliptical vignette setup (follows aspect ratio)
-  const aspectRatio = W / H;
-  const radiusX = (W * 0.5) * vignetteSize;
-  const radiusY = (H * 0.5) * vignetteSize;
-  
-  // Diagonal distance for proper corner coverage
-  const maxDist = Math.sqrt(W * W + H * H) * 0.5;
-  
-  const vigPower = (vignetteAmt||0) / 100;
-  const featherPower = vignetteFeather || 2.0;
-
-  for (let y=0; y<H; y++){
-    for (let x=0; x<W; x++){
-      const i = (y*W + x) * 4;
-      let r = d[i], g = d[i+1], bl = d[i+2];
-
-      // ========== STEP 1: EXPOSURE COMPENSATION (IN LINEAR SPACE) ==========
-      if (exposureComp !== 0) {
-        // Convert to linear space for proper exposure
-        const toLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4);
-        const toGamma = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-        
-        let rLin = toLinear(r);
-        let gLin = toLinear(g);
-        let bLin = toLinear(bl);
-        
-        // Apply exposure as stops (2^stops)
-        const multiplier = Math.pow(2, exposureComp);
-        rLin *= multiplier;
-        gLin *= multiplier;
-        bLin *= multiplier;
-        
-        r = Math.max(0, Math.min(255, toGamma(rLin) * 255));
-        g = Math.max(0, Math.min(255, toGamma(gLin) * 255));
-        bl = Math.max(0, Math.min(255, toGamma(bLin) * 255));
-      }
-
-      // ========== STEP 2: WHITE BALANCE (LAB SPACE) ==========
-      if (wb.r !== 0 || wb.g !== 0 || wb.b !== 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        const [labL, labA, labB] = lchToLab(L, C, H);
-        
-        const aShift = (wb.r - wb.g) * 3;
-        const bShift = (wb.b - (wb.r + wb.g) * 0.5) * 3;
-        
-        const newA = labA + aShift;
-        const newB = labB + bShift;
-        
-        [L, C, H] = labToLch(labL, newA, newB);
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      // ========== STEP 3: TONE CURVE (HIGHLIGHT/SHADOW) ==========
-      if (highlightAdj !== 0 || shadowAdj !== 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        
-        // Shadow adjustment (affects 0-30% luminance)
-        if (shadowAdj !== 0 && L < 30) {
-          const shadowStrength = (30 - L) / 30;  // 1.0 at L=0, 0.0 at L=30
-          L = L * (1 + shadowAdj * 0.15 * shadowStrength);
-        }
-        
-        // Highlight adjustment (affects 70-100% luminance)
-        if (highlightAdj !== 0 && L > 70) {
-          const highlightStrength = (L - 70) / 30;  // 0.0 at L=70, 1.0 at L=100
-          L = L * (1 + highlightAdj * 0.15 * highlightStrength);
-        }
-        
-        L = Math.max(0, Math.min(100, L));
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      // ========== STEP 4: FILM SIMULATION BASE ==========
-      if (film === 'acros'){
-        const a = (r+g+bl)/3;
-        r=g=bl=a;
-      } else {
-        const a = (r+g+bl)/3;
-        r = r*.85 + a*.15;
-        g = g*.85 + a*.15;
-        bl = bl*.85 + a*.15;
-      }
-
-      // ========== STEP 5: PER-COLOR ADJUSTMENTS (LCH) ==========
-      if (useColorMix){
-        let [L, C, H] = rgbToLch(r, g, bl);
-        
-        if (C > 5) {
-          const adj = getAdjustmentsForHue(H, cmState);
-          const chromaMultiplier = 1 + (adj.sat * 0.8);
-          C = Math.max(0, Math.min(130, C * chromaMultiplier));
-          L = Math.max(0, Math.min(100, L + adj.lum * 40));
-        }
-        
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      // ========== STEP 6: COLOR CHROME EFFECT ==========
-      // Deepens already-saturated colors (reds, yellows, greens)
-      if (colorChrome > 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        
-        // Only affect already-vibrant colors (C > 40)
-        if (C > 40) {
-          const strength = colorChrome === 1 ? 0.3 : 0.6; // Weak or Strong
-          
-          // Boost chroma more for reds/yellows/greens
-          let colorBoost = 1.0;
-          if ((H >= 0 && H <= 60) || (H >= 330 && H <= 360)) {
-            // Reds
-            colorBoost = 1.4;
-          } else if (H >= 40 && H <= 80) {
-            // Yellows
-            colorBoost = 1.2;
-          } else if (H >= 80 && H <= 160) {
-            // Greens
-            colorBoost = 1.15;
-          }
-          
-          const saturationFactor = Math.pow((C - 40) / 90, 0.6);
-          C = C + saturationFactor * strength * 35 * colorBoost;
-          
-          // Slightly darken to "deepen" the tone
-          L = L * (1 - saturationFactor * strength * 0.08);
-        }
-        
-        C = Math.max(0, Math.min(130, C));
-        L = Math.max(0, Math.min(100, L));
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      // ========== STEP 7: COLOR CHROME FX BLUE ==========
-      // Specifically deepens blues (polarizer-like effect)
-      if (colorChromeBlue > 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        
-        // Target blue hues (200-260°) with saturation
-        if (H >= 200 && H <= 260 && C > 20) {
-          const strength = colorChromeBlue === 1 ? 0.4 : 0.7;
-          const blueStrength = 1 - Math.abs(H - 230) / 30;  // Peak at 230°
-          
-          C = C * (1 + strength * blueStrength * 0.5);
-          L = L * (1 - strength * blueStrength * 0.12);  // Darken for depth
-        }
-        
-        C = Math.max(0, Math.min(130, C));
-        L = Math.max(0, Math.min(100, L));
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      // ========== STEP 8: TRICOLOR GRADING (LCH) ==========
-      if (useTricolor){
-        let [L, C, H] = rgbToLch(r, g, bl);
-        
-        const lumNorm = L / 100;
-        let shadowWeight = 0, midtoneWeight = 0, highlightWeight = 0;
-        
-        if (lumNorm < 0.5) {
-          shadowWeight = Math.exp(-8 * (lumNorm - 0.15) * (lumNorm - 0.15));
-          midtoneWeight = Math.exp(-8 * (lumNorm - 0.4) * (lumNorm - 0.4));
-        } else {
-          midtoneWeight = Math.exp(-8 * (lumNorm - 0.6) * (lumNorm - 0.6));
-          highlightWeight = Math.exp(-8 * (lumNorm - 0.85) * (lumNorm - 0.85));
-        }
-        
-        const totalWeight = shadowWeight + midtoneWeight + highlightWeight;
-        if (totalWeight > 0) {
-          shadowWeight /= totalWeight;
-          midtoneWeight /= totalWeight;
-          highlightWeight /= totalWeight;
-        }
-        
-        let hueShift = 0;
-        let chromaBoost = 0;
-        
-        if (shadowWeight > 0.1 && tricolorState.shadow.strength > 0) {
-          const strength = (tricolorState.shadow.strength / 100) * shadowWeight;
-          const targetHue = tricolorState.shadow.hue;
-          
-          let hueDelta = targetHue - H;
-          if (hueDelta > 180) hueDelta -= 360;
-          if (hueDelta < -180) hueDelta += 360;
-          
-          hueShift += hueDelta * strength * 0.3;
-          chromaBoost += strength * 20;
-        }
-        
-        if (midtoneWeight > 0.1 && tricolorState.midtone.strength > 0) {
-          const strength = (tricolorState.midtone.strength / 100) * midtoneWeight;
-          const targetHue = tricolorState.midtone.hue;
-          
-          let hueDelta = targetHue - H;
-          if (hueDelta > 180) hueDelta -= 360;
-          if (hueDelta < -180) hueDelta += 360;
-          
-          hueShift += hueDelta * strength * 0.3;
-          chromaBoost += strength * 20;
-        }
-        
-        if (highlightWeight > 0.1 && tricolorState.highlight.strength > 0) {
-          const strength = (tricolorState.highlight.strength / 100) * highlightWeight;
-          const targetHue = tricolorState.highlight.hue;
-          
-          let hueDelta = targetHue - H;
-          if (hueDelta > 180) hueDelta -= 360;
-          if (hueDelta < -180) hueDelta += 360;
-          
-          hueShift += hueDelta * strength * 0.3;
-          chromaBoost += strength * 20;
-        }
-        
-        H = (H + hueShift + 360) % 360;
-        C = Math.max(0, Math.min(130, C + chromaBoost));
-        
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      // ========== STEP 9: FILM GRAIN (PERLIN NOISE) ==========
-      if (grainAmt > 0){
-        const normalizedGrain = grainAmt / 50;
-        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 15;
-        
-        // Grain size determines scale (1=small, 2=medium, 3=large)
-        const scaleMap = [0, 0.015, 0.008, 0.004];  // Smaller scale = finer grain
-        const scale = scaleMap[grainSize] || 0.008;
-        const octaves = grainSize === 1 ? 3 : 2;  // More octaves for small grain
-        
-        // Generate Perlin noise for each channel with slight offset
-        const rNoise = perlinNoise(x + 1000, y, scale, octaves) * actualIntensity;
-        const gNoise = perlinNoise(x + 2000, y, scale, octaves) * actualIntensity;
-        const bNoise = perlinNoise(x + 3000, y, scale, octaves) * actualIntensity;
-        
-        // Luminance-dependent: more visible in midtones
-        const lum = (r + g + bl) / 3;
-        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.5;
-        
-        r += rNoise * lumFactor;
-        g += gNoise * lumFactor;
-        bl += bNoise * lumFactor;
-      }
-
-      // ========== STEP 10: VIGNETTE (ELLIPTICAL, QUARTIC) ==========
-      if (vigPower > 0){
-        const dx = x - cx;
-        const dy = y - cy;
-        
-        // Elliptical distance (normalized to 0-1)
-        const distX = dx / radiusX;
-        const distY = dy / radiusY;
-        const ellipticalDist = Math.sqrt(distX * distX + distY * distY);
-        
-        // Quartic falloff (cos^4 law for natural lens vignetting)
-        // featherPower controls how gradual the transition is (2-6)
-        const fall = Math.min(1, Math.max(0, ellipticalDist));
-        const vignetteFactor = 1 - vigPower * Math.pow(fall, featherPower);
-        
-        // Apply vignette
-        r *= vignetteFactor;
-        g *= vignetteFactor;
-        bl *= vignetteFactor;
-      }
-
-      d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
-      d[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
-      d[i+2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
+self.onmessage = e => {
+  const { imageData, film, grainAmt, exposureComp, vignetteAmt } = e.data;
+  const d = imageData.data, W = imageData.width, H = imageData.height;
+  const cx = W * 0.5, cy = H * 0.5, maxDist = Math.sqrt(cx * cx + cy * cy);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      let r = d[i], g = d[i+1], b = d[i+2];
+      if (exposureComp !== 0) { const m = Math.pow(2, exposureComp); r = Math.min(255, r * m); g = Math.min(255, g * m); b = Math.min(255, b * m); }
+      if (film === 'acros') { const a = (r + g + b) / 3; r = g = b = a; } else { const a = (r + g + b) / 3; r = r * 0.85 + a * 0.15; g = g * 0.85 + a * 0.15; b = b * 0.85 + a * 0.15; }
+      if (grainAmt > 0) { const n = (Math.random() - 0.5) * grainAmt * 0.5; r += n; g += n; b += n; }
+      if (vignetteAmt > 0) { const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) / maxDist; const v = 1 - (vignetteAmt / 100) * dist * dist; r *= v; g *= v; b *= v; }
+      d[i] = Math.max(0, Math.min(255, r)); d[i+1] = Math.max(0, Math.min(255, g)); d[i+2] = Math.max(0, Math.min(255, b));
     }
   }
-
-  // Apply halation effect (after all other processing)
-  if (useHalation) {
-    const { blur, strength, threshold } = halationState;
-    
-    const brightPixels = new Uint8ClampedArray(d.length);
-    for (let i = 0; i < d.length; i += 4) {
-      const brightness = (d[i] + d[i+1] + d[i+2]) / 3;
-      if (brightness >= threshold) {
-        brightPixels[i] = 255;
-        brightPixels[i+1] = 255;
-        brightPixels[i+2] = 255;
-        brightPixels[i+3] = 255;
-      }
-    }
-    
-    const blurRadius = Math.max(1, Math.round(blur));
-    const blurred = new Uint8ClampedArray(brightPixels.length);
-    
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, sumG = 0, sumB = 0, count = 0;
-        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
-          const nx = x + dx;
-          if (nx >= 0 && nx < W) {
-            const idx = (y * W + nx) * 4;
-            sumR += brightPixels[idx];
-            sumG += brightPixels[idx + 1];
-            sumB += brightPixels[idx + 2];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        blurred[idx] = sumR / count;
-        blurred[idx + 1] = sumG / count;
-        blurred[idx + 2] = sumB / count;
-      }
-    }
-    
-    const blurred2 = new Uint8ClampedArray(blurred.length);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, sumG = 0, sumB = 0, count = 0;
-        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
-          const ny = y + dy;
-          if (ny >= 0 && ny < H) {
-            const idx = (ny * W + x) * 4;
-            sumR += blurred[idx];
-            sumG += blurred[idx + 1];
-            sumB += blurred[idx + 2];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        blurred2[idx] = sumR / count;
-        blurred2[idx + 1] = sumG / count;
-        blurred2[idx + 2] = sumB / count;
-      }
-    }
-    
-    for (let i = 0; i < blurred2.length; i += 4) {
-      if (blurred2[i] > 0 || blurred2[i+1] > 0 || blurred2[i+2] > 0) {
-        const brightness = (blurred2[i] + blurred2[i+1] + blurred2[i+2]) / 3;
-        blurred2[i] = Math.min(255, brightness + strength);
-        blurred2[i+1] = 0;
-        blurred2[i+2] = 0;
-      }
-    }
-    
-    const finalBlurred = new Uint8ClampedArray(blurred2.length);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, count = 0;
-        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
-          const nx = x + dx;
-          if (nx >= 0 && nx < W) {
-            const idx = (y * W + nx) * 4;
-            sumR += blurred2[idx];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        finalBlurred[idx] = sumR / count;
-      }
-    }
-    
-    const finalBlurred2 = new Uint8ClampedArray(finalBlurred.length);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, count = 0;
-        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
-          const ny = y + dy;
-          if (ny >= 0 && ny < H) {
-            const idx = (ny * W + x) * 4;
-            sumR += finalBlurred[idx];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        finalBlurred2[idx] = sumR / count;
-      }
-    }
-    
-    for (let i = 0; i < d.length; i += 4) {
-      const halationR = finalBlurred2[i];
-      if (halationR > 0) {
-        const origR = d[i] / 255;
-        const origG = d[i+1] / 255;
-        const origB = d[i+2] / 255;
-        const halR = halationR / 255;
-        
-        d[i] = Math.min(255, (1 - (1 - origR) * (1 - halR)) * 255);
-        d[i+1] = Math.min(255, (1 - (1 - origG) * (1 - halR)) * 255);
-        d[i+2] = Math.min(255, (1 - (1 - origB) * (1 - halR)) * 255);
-      }
-    }
-  }
-
   self.postMessage({ imageData }, [imageData.data.buffer]);
-};
-`;
-const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], {type: 'application/javascript'})));
+};`;
+const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'application/javascript' })));
 
-/* ========== SHOOT ========== */
-shutter.addEventListener('click', () => {
-  userText = '';
-  shoot();
-});
+// Shoot
+shutter.addEventListener('click', () => { userText = ''; shoot(); });
 
-async function shoot() {
-  if (!video.videoWidth) {
-    alert('Wait for camera');
-    return;
-  }
-
-  const w = video.videoWidth;
-  const h = video.videoHeight;
-  const b = Math.floor(Math.min(w, h) * 0.09);
-  const fw = w + b * 2;
-  const bot = b * 2;
-  const fh = h + b + bot;
-
-  canvas.width = fw;
-  canvas.height = fh;
-  dim = { fw, fh, b, bot };
-
+function shoot() {
+  if (!video.videoWidth) { alert('Wait for camera'); return; }
+  const w = video.videoWidth, h = video.videoHeight, b = Math.floor(Math.min(w, h) * 0.09);
+  const fw = w + b * 2, bot = b * 2, fh = h + b + bot;
+  canvas.width = fw; canvas.height = fh; dim = { fw, fh, b, bot };
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, fw, fh);
-  ctx.drawImage(video, b, b, w, h);
-
-  canvas.style.display = 'block';
-  video.style.display = 'none';
-  nextBtn.style.display = 'flex';
-  textBtn.style.display = 'flex';
-  saveBtn.style.display = 'flex';
-  
-  // Close bottom sheet when taking photo
-  sheetExpanded = false;
-  bottomSheet.classList.remove('expanded');
-
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, fw, fh); ctx.drawImage(video, b, b, w, h);
+  canvas.style.display = 'block'; video.style.display = 'none';
+  nextBtn.style.display = 'flex'; textBtn.style.display = 'flex'; saveBtn.style.display = 'flex';
+  sheetExpanded = false; bottomSheet.classList.remove('expanded');
   const roi = ctx.getImageData(b, b, w, h);
-  processingEl.style.display = 'flex';
-
-  worker.postMessage({
-    imageData: roi,
-    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
-    grainAmt,
-    grainSize,
-    exposureComp,
-    highlightAdj,
-    shadowAdj,
-    colorChrome,
-    colorChromeBlue,
-    cmState,
-    colors,
-    hueWidth,
-    wb,
-    vignetteAmt,
-    vignetteSize,
-    vignetteFeather,
-    tricolorState,
-    halationState
-  }, [roi.data.buffer]);
-
-  worker.onmessage = (e) => {
-    const { imageData } = e.data;
-    ctx.putImageData(imageData, b, b);
-    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
-    drawText(ctx);
-    processingEl.style.display = 'none';
-  };
+  processingEl.style.display = 'flex'; processingText.textContent = 'Applying film simulation';
+  worker.postMessage({ imageData: roi, film, grainAmt, exposureComp, vignetteAmt }, [roi.data.buffer]);
+  worker.onmessage = e => { ctx.putImageData(e.data.imageData, b, b); lastFrameImageData = ctx.getImageData(0, 0, fw, fh); drawText(ctx); processingEl.style.display = 'none'; };
 }
 
 function shootReprocess() {
   if (!dim) return;
-  const { fw, fh, b, bot } = dim;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const { fw, fh, b, bot } = dim, ctx = canvas.getContext('2d', { willReadFrequently: true });
   const roi = ctx.getImageData(b, b, canvas.width - b * 2, canvas.height - b * 2 - (bot - b));
-  
   processingEl.style.display = 'flex';
-
-  worker.postMessage({
-    imageData: roi,
-    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
-    grainAmt,
-    grainSize,
-    exposureComp,
-    highlightAdj,
-    shadowAdj,
-    colorChrome,
-    colorChromeBlue,
-    cmState,
-    colors,
-    hueWidth,
-    wb,
-    vignetteAmt,
-    vignetteSize,
-    vignetteFeather,
-    tricolorState,
-    halationState
-  }, [roi.data.buffer]);
-
-  worker.onmessage = (e) => {
-    const { imageData } = e.data;
-    ctx.putImageData(imageData, b, b);
-    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
-    drawText(ctx);
-    processingEl.style.display = 'none';
-  };
+  worker.postMessage({ imageData: roi, film, grainAmt, exposureComp, vignetteAmt }, [roi.data.buffer]);
+  worker.onmessage = e => { ctx.putImageData(e.data.imageData, b, b); lastFrameImageData = ctx.getImageData(0, 0, fw, fh); drawText(ctx); processingEl.style.display = 'none'; };
 }
 
-/* ========== TEXT ========== */
-const textModal = document.getElementById('text-modal');
-const textInput = document.getElementById('text-input');
+// Text
+const textModal = document.getElementById('text-modal'), textInput = document.getElementById('text-input');
+textBtn.addEventListener('click', () => { textModal.style.display = 'flex'; textInput.focus(); });
+document.getElementById('text-cancel').addEventListener('click', () => { textModal.style.display = 'none'; textInput.value = ''; });
+document.getElementById('text-submit').addEventListener('click', async () => { userText = textInput.value.trim(); if (userText) { await document.fonts?.load('131px "Mrs Saint Delafield"').catch(() => {}); updateText(); } textModal.style.display = 'none'; textInput.value = ''; });
 
-textBtn.addEventListener('click', () => {
-  textModal.style.display = 'flex';
-  textInput.focus();
-});
-
-document.getElementById('text-cancel').addEventListener('click', () => {
-  textModal.style.display = 'none';
-  textInput.value = '';
-});
-
-document.getElementById('text-submit').addEventListener('click', async () => {
-  userText = textInput.value.trim();
-  if (userText) {
-    // Ensure font is loaded before drawing
-    if (document.fonts) {
-      await document.fonts.load('131px "Mrs Saint Delafield"').catch(() => {});
-    }
-    updateText();
-  }
-  textModal.style.display = 'none';
-  textInput.value = '';
-});
-
-function updateText() {
-  if (!dim) return;
-  const ctx = canvas.getContext('2d');
-  // Restore the processed image WITHOUT text
-  if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
-  // Draw text fresh on top
-  drawText(ctx);
-}
+function updateText() { if (!dim) return; const ctx = canvas.getContext('2d'); if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0); drawText(ctx); }
 
 function drawText(ctx) {
   if (!userText || !dim) return;
   const { fw, fh, bot } = dim;
-  
-  // Ensure font is loaded before drawing
-  if (document.fonts) {
-    document.fonts.load('131px "Mrs Saint Delafield"').catch(() => {});
-  }
-  
-  let fs = 131;
-  ctx.font = `${fs}px "Mrs Saint Delafield", cursive`;
-  while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
-    fs--;
-    ctx.font = `${fs}px "Mrs Saint Delafield", cursive`;
-  }
-  
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  let fs = 131; ctx.font = `${fs}px "Mrs Saint Delafield", cursive`;
+  while (ctx.measureText(userText).width > fw - 20 && fs > 16) { fs--; ctx.font = `${fs}px "Mrs Saint Delafield", cursive`; }
+  ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(userText, fw / 2, fh - bot / 2);
-  // DO NOT update lastFrameImageData here - it should stay as the image without text
 }
 
-/* ========== NEXT/RESET ========== */
-nextBtn.addEventListener('click', () => {
-  video.style.display = 'block';
-  canvas.style.display = 'none';
-  nextBtn.style.display = 'none';
-  textBtn.style.display = 'none';
-  saveBtn.style.display = 'none';
-  lastFrameImageData = null;
-  dim = null;
-  userText = '';
-});
+// Reset
+nextBtn.addEventListener('click', () => { video.style.display = 'block'; canvas.style.display = 'none'; nextBtn.style.display = 'none'; textBtn.style.display = 'none'; saveBtn.style.display = 'none'; lastFrameImageData = null; dim = null; userText = ''; });
 
-/* ========== SAVE ========== */
+// Save
 saveBtn.addEventListener('click', () => {
-  if (!dim) {
-    alert('Take a photo first');
-    return;
-  }
-  
-  const { fw, fh } = dim;
-  const scale = 1810 / 4420;
-  const tmp = document.createElement('canvas');
-  
-  tmp.width = Math.floor(fw * scale);
-  tmp.height = Math.floor(fh * scale);
-  const tctx = tmp.getContext('2d');
-  tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
-  
+  if (!dim) { alert('Take a photo first'); return; }
+  const { fw, fh } = dim, scale = 0.4, tmp = document.createElement('canvas');
+  tmp.width = Math.floor(fw * scale); tmp.height = Math.floor(fh * scale);
+  tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
   tmp.toBlob(blob => {
-    if (!blob) {
-      alert('Save failed');
-      return;
-    }
-    
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `photo-${Date.now()}.jpg`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    
-    const fr = new FileReader();
-    fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result);
-    fr.readAsDataURL(blob);
+    if (!blob) { alert('Save failed'); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `photo-${Date.now()}.jpg`; a.click();
+    const fr = new FileReader(); fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result); fr.readAsDataURL(blob);
   }, 'image/jpeg', jpegQ / 100);
 });
 
-/* ========== GALLERY ========== */
+// Gallery
 document.getElementById('gallery-btn').addEventListener('click', () => {
-  const content = document.getElementById('gallery-content');
-  content.innerHTML = '';
-  
-  const keys = Object.keys(localStorage)
-    .filter(k => k.startsWith('saved-photo-'))
-    .sort()
-    .reverse();
-  
-  if (!keys.length) {
-    content.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">No saved images</p>';
-  } else {
-    keys.forEach(k => {
-      const img = document.createElement('img');
-      img.src = localStorage.getItem(k);
-      content.appendChild(img);
-    });
-  }
-  
+  const content = document.getElementById('gallery-content'); content.innerHTML = '';
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('saved-photo-') || k.startsWith('saved-gif-')).sort().reverse();
+  if (!keys.length) content.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">No saved images</p>';
+  else keys.forEach(k => { const img = document.createElement('img'); img.src = localStorage.getItem(k); content.appendChild(img); });
   document.getElementById('gallery-overlay').style.display = 'flex';
 });
+document.getElementById('gallery-close').addEventListener('click', () => { document.getElementById('gallery-overlay').style.display = 'none'; });
 
-document.getElementById('gallery-close').addEventListener('click', () => {
-  document.getElementById('gallery-overlay').style.display = 'none';
-});
+// Profiles
+const PROFILE_KEY = 'filmProfilesV1'; let profiles = {};
+function loadProfiles() { try { profiles = JSON.parse(localStorage.getItem(PROFILE_KEY)) || {}; } catch {} renderProfiles(); }
+function renderProfiles() {
+  const container = document.getElementById('custom-profiles'); container.innerHTML = '';
+  Object.keys(profiles).forEach(name => {
+    const card = document.createElement('div'); card.className = 'preset-card';
+    card.innerHTML = `<div class="preset-name">${name}</div><div class="preset-desc">Custom profile</div>`;
+    card.addEventListener('click', () => { document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active')); card.classList.add('active'); applyProfile(name); });
+    container.appendChild(card);
+  });
+}
+function applyProfile(name) { const p = profiles[name]; if (!p) return; film = p.filmBase || 'kodachrome'; grainAmt = p.grainAmt || 0; exposureComp = p.exposureComp || 0; vignetteAmt = p.vignetteAmt || 0; exposureSlider.value = exposureComp; grainSlider.value = grainAmt; vignetteSlider.value = vignetteAmt; exposureVal.textContent = exposureComp.toFixed(1); grainVal.textContent = grainAmt; vigVal.textContent = vignetteAmt; if (lastFrameImageData) shootReprocess(); }
+document.getElementById('save-profile-btn').addEventListener('click', () => { const name = prompt('Profile name?'); if (!name) return; profiles[name] = { filmBase: film, grainAmt, exposureComp, vignetteAmt }; localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles)); renderProfiles(); alert('Profile saved: ' + name); });
 
-/* ========== INIT ========== */
 loadProfiles();
 bootCam();
-
-// Prevent context menu except on photo
-document.addEventListener('contextmenu', e => {
-  if (e.target.id !== 'photo') e.preventDefault();
-}, { passive: false });
+document.addEventListener('contextmenu', e => { if (e.target.id !== 'photo') e.preventDefault(); }, { passive: false });
 </script>
-
 </body>
 </html>
