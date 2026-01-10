@@ -162,7 +162,7 @@ const menuTrigger = document.getElementById('menu-trigger');
 let stream = null, grainAmt = 0, film = 'kodachrome', jpegQ = 60, userText = '', dim = null, lastFrameImageData = null;
 let exposureComp = 0, vignetteAmt = 0;
 let gifRecording = false, gifFrames = [];
-const GIF_FRAME_COUNT = 20, GIF_FRAME_DELAY = 100;
+const GIF_FRAME_COUNT = 8, GIF_FRAME_DELAY = 100;
 
 // GIF Recording
 gifBtn.addEventListener('click', () => { gifRecording ? stopGifRecording() : startGifRecording(); });
