@@ -7,7 +7,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#000000">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mistrully&display=swap">
   <style>
 :root {
   --ui-scale: 1;
@@ -2756,7 +2756,7 @@ document.getElementById('text-submit').addEventListener('click', async () => {
   if (userText) {
     // Ensure font is loaded before drawing
     if (document.fonts) {
-      await document.fonts.load('131px "Mrs Saint Delafield"').catch(() => {});
+      await document.fonts.load('131px "Mistrully"').catch(() => {});
     }
     updateText();
   }
@@ -2779,14 +2779,14 @@ function drawText(ctx) {
   
   // Ensure font is loaded before drawing
   if (document.fonts) {
-    document.fonts.load('131px "Mrs Saint Delafield"').catch(() => {});
+    document.fonts.load('131px "Mistrully"').catch(() => {});
   }
   
   let fs = 131;
-  ctx.font = `${fs}px "Mrs Saint Delafield", cursive`;
+  ctx.font = `${fs}px "Mistrully", cursive`;
   while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
     fs--;
-    ctx.font = `${fs}px "Mrs Saint Delafield", cursive`;
+    ctx.font = `${fs}px "Mistrully", cursive`;
   }
   
   ctx.fillStyle = '#000';
