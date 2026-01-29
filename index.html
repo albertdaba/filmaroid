@@ -1022,6 +1022,11 @@ select {
 <!-- Text Modal -->
 <div id="text-modal">
   <input type="text" id="text-input" maxlength="50" placeholder="Enter text for photo" style="font-size: 14px;">
+  <div style="display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 0;">
+    <button id="font-decrease" style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer;">−</button>
+    <span id="font-size-display" style="color: rgba(255,255,255,0.8); font-size: 14px; min-width: 60px; text-align: center;">Size: 131</span>
+    <button id="font-increase" style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer;">+</button>
+  </div>
   <div class="modal-buttons">
     <button id="text-cancel" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; padding: 10px;">Cancel</button>
     <button id="text-submit" style="background: #007aff; color: #fff; font-size: 14px; padding: 10px;">Add Text</button>
@@ -1069,6 +1074,7 @@ let grainSize = 2; // 1=small, 2=medium, 3=large
 let film = 'kodachrome';
 let jpegQ = 60;
 let userText = '';
+let textFontSize = 131;
 let dim = null;
 let lastFrameImageData = null;
 let activeProfileName = null;
