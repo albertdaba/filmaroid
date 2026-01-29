@@ -598,6 +598,27 @@ select {
   cursor: pointer;
 }
 
+
+
+    #font-size-controls {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+#decrease-font, #increase-font {
+  pointer-events: auto;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 18px;
+  font-weight: bold;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  min-width: 40px;
+}
 /* ========== GALLERY ========== */
 #gallery-overlay {
   position: fixed;
@@ -686,12 +707,17 @@ select {
   <img id="photo">
 </div>
 
+
 <!-- Top Bar -->
 <div id="top-bar">
   <button id="camera-switch">📷</button>
+  <div id="font-size-controls" style="display: none;">
+    <button id="decrease-font">-</button>
+    <button id="increase-font">+</button>
+  </div>
   <button id="gallery-btn">Gallery</button>
 </div>
-
+  
 <!-- Bottom Controls -->
 <div id="bottom-controls">
   <button id="menu-trigger">☰</button>
@@ -1022,16 +1048,12 @@ select {
 <!-- Text Modal -->
 <div id="text-modal">
   <input type="text" id="text-input" maxlength="50" placeholder="Enter text for photo" style="font-size: 14px;">
-  <div style="display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 0;">
-    <button id="font-decrease" style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer;">−</button>
-    <span id="font-size-display" style="color: rgba(255,255,255,0.8); font-size: 14px; min-width: 60px; text-align: center;">Size: 131</span>
-    <button id="font-increase" style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer;">+</button>
-  </div>
   <div class="modal-buttons">
     <button id="text-cancel" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; padding: 10px;">Cancel</button>
     <button id="text-submit" style="background: #007aff; color: #fff; font-size: 14px; padding: 10px;">Add Text</button>
   </div>
 </div>
+
 
 <!-- Gallery -->
 <div id="gallery-overlay">
@@ -1074,7 +1096,6 @@ let grainSize = 2; // 1=small, 2=medium, 3=large
 let film = 'kodachrome';
 let jpegQ = 60;
 let userText = '';
-let textFontSize = 131;
 let dim = null;
 let lastFrameImageData = null;
 let activeProfileName = null;
@@ -1084,7 +1105,8 @@ let highlightAdj = 0;
 let shadowAdj = 0;
 let colorChrome = 0; // 0=off, 1=weak, 2=strong
 let colorChromeBlue = 0; // 0=off, 1=weak, 2=strong
-
+let currentFontSize = 131;
+  
 const PROFILE_KEY = 'filmProfilesV1';
 let profiles = {};
 
@@ -2653,6 +2675,7 @@ async function shoot() {
     return;
   }
 
+  document.getElementById('font-size-controls').style.display = 'none';
   const w = video.videoWidth;
   const h = video.videoHeight;
   const b = Math.floor(Math.min(w, h) * 0.09);
@@ -2773,6 +2796,8 @@ document.getElementById('text-submit').addEventListener('click', async () => {
       await document.fonts.load('131px "Mistrully"').catch(() => {});
     }
     updateText();
+    // Show font size controls ONLY when text is applied
+    document.getElementById('font-size-controls').style.display = 'flex';
   }
   textModal.style.display = 'none';
   textInput.value = '';
@@ -2793,11 +2818,13 @@ function drawText(ctx) {
   
   // Ensure font is loaded before drawing
   if (document.fonts) {
-    document.fonts.load('131px "Mistrully"').catch(() => {});
+    document.fonts.load(`${currentFontSize}px "Mistrully"`).catch(() => {});
   }
   
-  let fs = 131;
-  ctx.font = `${fs}px "Mistrully", cursive`;
+  ctx.font = `${currentFontSize}px "Mistrully", cursive`;
+  
+  // Auto-shrink if text is too wide
+  let fs = currentFontSize;
   while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
     fs--;
     ctx.font = `${fs}px "Mistrully", cursive`;
@@ -2807,7 +2834,6 @@ function drawText(ctx) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(userText, fw / 2, fh - bot / 2);
-  // DO NOT update lastFrameImageData here - it should stay as the image without text
 }
 
 /* ========== NEXT/RESET ========== */
@@ -2817,9 +2843,11 @@ nextBtn.addEventListener('click', () => {
   nextBtn.style.display = 'none';
   textBtn.style.display = 'none';
   saveBtn.style.display = 'none';
+  document.getElementById('font-size-controls').style.display = 'none'; // Hide controls
   lastFrameImageData = null;
   dim = null;
   userText = '';
+  currentFontSize = 131; // Reset font size
 });
 
 /* ========== SAVE ========== */
@@ -2883,6 +2911,21 @@ document.getElementById('gallery-close').addEventListener('click', () => {
   document.getElementById('gallery-overlay').style.display = 'none';
 });
 
+// Font size controls
+document.getElementById('increase-font').addEventListener('click', () => {
+  if (userText && currentFontSize < 200) {
+    currentFontSize += 5;
+    updateText();
+  }
+});
+
+document.getElementById('decrease-font').addEventListener('click', () => {
+  if (userText && currentFontSize > 20) {
+    currentFontSize -= 5;
+    updateText();
+  }
+});
+  
 /* ========== INIT ========== */
 loadProfiles();
 bootCam();
