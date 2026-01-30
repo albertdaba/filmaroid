@@ -598,9 +598,7 @@ select {
   cursor: pointer;
 }
 
-
-
-    #font-size-controls {
+#font-size-controls {
   display: flex;
   gap: 10px;
   pointer-events: auto;
@@ -619,6 +617,7 @@ select {
   cursor: pointer;
   min-width: 40px;
 }
+
 /* ========== GALLERY ========== */
 #gallery-overlay {
   position: fixed;
@@ -741,24 +740,28 @@ select {
   <div id="tab-content">
     <!-- PRESETS TAB -->
     <div class="tab-panel active" id="presets-panel">
-      <div id="preset-grid">
-        <div class="preset-card active" data-preset="kodachrome">
-          <div class="preset-name">Kodachrome</div>
-          <div class="preset-desc">Classic warm</div>
-        </div>
-        <div class="preset-card" data-preset="acros">
-          <div class="preset-name">Acros</div>
-          <div class="preset-desc">B&W film</div>
-        </div>
-        <div class="preset-card" data-preset="velvia">
-          <div class="preset-name">Velvia</div>
-          <div class="preset-desc">Vibrant colors</div>
-        </div>
-        <div class="preset-card" data-preset="provia">
-          <div class="preset-name">Provia</div>
-          <div class="preset-desc">Natural tones</div>
-        </div>
-      </div>
+ <div id="preset-grid">
+  <div class="preset-card active" data-preset="filmic-a">
+    <div class="preset-name">Filmic A</div>
+    <div class="preset-desc">Warm halation</div>
+  </div>
+  <div class="preset-card" data-preset="kodachrome">
+    <div class="preset-name">Kokakhrome</div>
+    <div class="preset-desc">Classic warm</div>
+  </div>
+  <div class="preset-card" data-preset="acros">
+    <div class="preset-name">Blackross</div>
+    <div class="preset-desc">B&W film</div>
+  </div>
+  <div class="preset-card" data-preset="velvia">
+    <div class="preset-name">Vibria</div>
+    <div class="preset-desc">Vibrant colors</div>
+  </div>
+  <div class="preset-card" data-preset="provia">
+    <div class="preset-name">Natura</div>
+    <div class="preset-desc">Natural tones</div>
+  </div>
+</div>
       
       <div class="divider"></div>
       
@@ -1092,7 +1095,7 @@ const sheetHandle = document.getElementById('sheet-handle');
 /* ========== STATE ========== */
 let stream = null;
 let grainAmt = 0;
-let grainSize = 2; // 1=small, 2=medium, 3=large
+let grainSize = 2;
 let film = 'kodachrome';
 let jpegQ = 60;
 let userText = '';
@@ -1103,8 +1106,8 @@ let activeProfileName = null;
 let exposureComp = 0;
 let highlightAdj = 0;
 let shadowAdj = 0;
-let colorChrome = 0; // 0=off, 1=weak, 2=strong
-let colorChromeBlue = 0; // 0=off, 1=weak, 2=strong
+let colorChrome = 0;
+let colorChromeBlue = 0;
 let currentFontSize = 131;
   
 const PROFILE_KEY = 'filmProfilesV1';
@@ -1132,7 +1135,6 @@ let vignetteAmt = 0;
 let vignetteSize = 0.7;
 let vignetteFeather = 2.0;
 
-/* ========== TRICOLOR WHEEL STATE ========== */
 const TRICOLOR_KEY = 'tricolorSettingsV1';
 let tricolorState = {
   enable: false,
@@ -1141,7 +1143,6 @@ let tricolorState = {
   highlight: { hue: 180, strength: 0 }
 };
 
-/* ========== HALATION STATE ========== */
 const HALATION_KEY = 'halationSettingsV1';
 let halationState = {
   enable: false,
@@ -1207,7 +1208,6 @@ menuTrigger.addEventListener('click', (e) => {
   bottomSheet.classList.toggle('expanded', sheetExpanded);
 });
 
-// Close bottom sheet when clicking outside
 document.addEventListener('click', (e) => {
   if (sheetExpanded && 
       !bottomSheet.contains(e.target) && 
@@ -1217,7 +1217,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Prevent clicks inside bottom sheet from closing it
 bottomSheet.addEventListener('click', (e) => {
   e.stopPropagation();
 });
@@ -1243,12 +1242,98 @@ sheetHandle.addEventListener('touchend', (e) => {
   }
 });
 
-/* ========== PRESETS ========== */
+/* ========== PRESETS (Option 1 - Inline handling) ========== */
 document.querySelectorAll('.preset-card').forEach(card => {
   card.addEventListener('click', () => {
     document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
     card.classList.add('active');
-    film = card.dataset.preset;
+    
+    const preset = card.dataset.preset;
+    if (preset === 'filmic-a') {
+      // Apply Filmic A full settings
+      film = 'kodachrome';
+      grainAmt = 0; grainSize = 2; exposureComp = 0; highlightAdj = 0;
+      shadowAdj = 1.4;
+      colorChrome = 0; colorChromeBlue = 0;
+      wb = { r: -2, g: 2, b: 3 };
+      vignetteAmt = 0; vignetteSize = 0.7; vignetteFeather = 2.0;
+      cmState = { enable: false, dH: [0,0,0,0,0,0,0,0], dS: [0,0,0,0,0,0,0,0], dL: [0,0,0,0,0,0,0,0] };
+      tricolorState = { enable: false, shadow: { hue: 180, strength: 0 }, midtone: { hue: 180, strength: 0 }, highlight: { hue: 180, strength: 0 } };
+      halationState = { enable: true, blur: 17, strength: 27, threshold: 221 };
+      
+      // Update UI
+      document.getElementById('grain').value = grainAmt;
+      document.getElementById('grain-val').textContent = grainAmt;
+      document.getElementById('grain-size').value = grainSize;
+      document.getElementById('grain-size-val').textContent = 'Medium';
+      document.getElementById('exposure').value = exposureComp;
+      document.getElementById('exposure-val').textContent = '0.0';
+      document.getElementById('highlight').value = highlightAdj;
+      document.getElementById('highlight-val').textContent = '0.0';
+      document.getElementById('shadow').value = shadowAdj;
+      document.getElementById('shadow-val').textContent = '+' + shadowAdj.toFixed(1);
+      document.getElementById('color-chrome').value = colorChrome;
+      document.getElementById('color-chrome-blue').value = colorChromeBlue;
+      document.getElementById('wb-r').value = wb.r;
+      document.getElementById('wb-r-val').textContent = wb.r;
+      document.getElementById('wb-g').value = wb.g;
+      document.getElementById('wb-g-val').textContent = wb.g;
+      document.getElementById('wb-b').value = wb.b;
+      document.getElementById('wb-b-val').textContent = wb.b;
+      document.getElementById('vignette').value = vignetteAmt;
+      document.getElementById('vig-val').textContent = vignetteAmt;
+      document.getElementById('vignette-size').value = vignetteSize;
+      document.getElementById('vig-size-val').textContent = vignetteSize.toFixed(2);
+      document.getElementById('vignette-feather').value = vignetteFeather;
+      document.getElementById('vig-feather-val').textContent = vignetteFeather.toFixed(1);
+      document.getElementById('cm-enable').checked = false;
+      document.getElementById('cm-wrapper').style.display = 'none';
+      document.getElementById('tricolor-enable').checked = false;
+      document.getElementById('tricolor-wrapper').style.display = 'none';
+      updateHalationUI();
+    } else {
+      // Simple preset - just change film base and reset to defaults
+      film = preset;
+      grainAmt = 0; grainSize = 2; exposureComp = 0; highlightAdj = 0; shadowAdj = 0;
+      colorChrome = 0; colorChromeBlue = 0;
+      wb = { r: 0, g: 0, b: 0 };
+      vignetteAmt = 0; vignetteSize = 0.7; vignetteFeather = 2.0;
+      cmState = { enable: false, dH: [0,0,0,0,0,0,0,0], dS: [0,0,0,0,0,0,0,0], dL: [0,0,0,0,0,0,0,0] };
+      tricolorState = { enable: false, shadow: { hue: 180, strength: 0 }, midtone: { hue: 180, strength: 0 }, highlight: { hue: 180, strength: 0 } };
+      halationState = { enable: false, blur: 10, strength: 50, threshold: 200 };
+      
+      // Update UI
+      document.getElementById('grain').value = grainAmt;
+      document.getElementById('grain-val').textContent = grainAmt;
+      document.getElementById('grain-size').value = grainSize;
+      document.getElementById('grain-size-val').textContent = 'Medium';
+      document.getElementById('exposure').value = exposureComp;
+      document.getElementById('exposure-val').textContent = '0.0';
+      document.getElementById('highlight').value = highlightAdj;
+      document.getElementById('highlight-val').textContent = '0.0';
+      document.getElementById('shadow').value = shadowAdj;
+      document.getElementById('shadow-val').textContent = '0.0';
+      document.getElementById('color-chrome').value = colorChrome;
+      document.getElementById('color-chrome-blue').value = colorChromeBlue;
+      document.getElementById('wb-r').value = wb.r;
+      document.getElementById('wb-r-val').textContent = wb.r;
+      document.getElementById('wb-g').value = wb.g;
+      document.getElementById('wb-g-val').textContent = wb.g;
+      document.getElementById('wb-b').value = wb.b;
+      document.getElementById('wb-b-val').textContent = wb.b;
+      document.getElementById('vignette').value = vignetteAmt;
+      document.getElementById('vig-val').textContent = vignetteAmt;
+      document.getElementById('vignette-size').value = vignetteSize;
+      document.getElementById('vig-size-val').textContent = vignetteSize.toFixed(2);
+      document.getElementById('vignette-feather').value = vignetteFeather;
+      document.getElementById('vig-feather-val').textContent = vignetteFeather.toFixed(1);
+      document.getElementById('cm-enable').checked = false;
+      document.getElementById('cm-wrapper').style.display = 'none';
+      document.getElementById('tricolor-enable').checked = false;
+      document.getElementById('tricolor-wrapper').style.display = 'none';
+      updateHalationUI();
+    }
+    
     activeProfileName = null;
     if (lastFrameImageData) shootReprocess();
   });
@@ -1369,20 +1454,6 @@ vignetteFeatherSlider.addEventListener('input', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
-// Initialize slider displays
-wbRVal.textContent = wb.r;
-wbGVal.textContent = wb.g;
-wbBVal.textContent = wb.b;
-vigVal.textContent = vignetteAmt;
-vigSizeVal.textContent = vignetteSize.toFixed(2);
-vigFeatherVal.textContent = vignetteFeather.toFixed(1);
-wbRSlider.value = wb.r;
-wbGSlider.value = wb.g;
-wbBSlider.value = wb.b;
-vignetteSlider.value = vignetteAmt;
-vignetteSizeSlider.value = vignetteSize;
-vignetteFeatherSlider.value = vignetteFeather;
-
 /* ========== HALATION ========== */
 const halationEnable = document.getElementById('halation-enable');
 const halationWrapper = document.getElementById('halation-wrapper');
@@ -1435,8 +1506,6 @@ halationThreshold.addEventListener('input', () => {
   saveHalationState();
   if (lastFrameImageData) shootReprocess();
 });
-
-updateHalationUI();
 
 /* ========== COLOR MIX ========== */
 const cmEnable = document.getElementById('cm-enable');
@@ -1519,7 +1588,6 @@ updateColorControls();
 const tricolorEnable = document.getElementById('tricolor-enable');
 const tricolorWrapper = document.getElementById('tricolor-wrapper');
 
-// Sliders
 const shadowHue = document.getElementById('shadow-hue');
 const shadowStr = document.getElementById('shadow-strength');
 const shadowHueVal = document.getElementById('shadow-hue-val');
@@ -1537,7 +1605,6 @@ const highlightStrVal = document.getElementById('highlight-str-val');
 
 const tricolorReset = document.getElementById('tricolor-reset');
 
-// Color wheels
 const shadowWheel = document.getElementById('shadow-wheel');
 const midtoneWheel = document.getElementById('midtone-wheel');
 const highlightWheel = document.getElementById('highlight-wheel');
@@ -1546,21 +1613,18 @@ function updateTricolorUI() {
   tricolorEnable.checked = tricolorState.enable;
   tricolorWrapper.style.display = tricolorState.enable ? 'block' : 'none';
   
-  // Update shadow
   shadowHue.value = tricolorState.shadow.hue;
   shadowStr.value = tricolorState.shadow.strength;
   shadowHueVal.textContent = tricolorState.shadow.hue + '°';
   shadowStrVal.textContent = tricolorState.shadow.strength + '%';
   updateWheelIndicator(shadowWheel, tricolorState.shadow.hue);
   
-  // Update midtone
   midtoneHue.value = tricolorState.midtone.hue;
   midtoneStr.value = tricolorState.midtone.strength;
   midtoneHueVal.textContent = tricolorState.midtone.hue + '°';
   midtoneStrVal.textContent = tricolorState.midtone.strength + '%';
   updateWheelIndicator(midtoneWheel, tricolorState.midtone.hue);
   
-  // Update highlight
   highlightHue.value = tricolorState.highlight.hue;
   highlightStr.value = tricolorState.highlight.strength;
   highlightHueVal.textContent = tricolorState.highlight.hue + '°';
@@ -1577,7 +1641,6 @@ function saveTricolorState() {
   localStorage.setItem(TRICOLOR_KEY, JSON.stringify(tricolorState));
 }
 
-// Mutual exclusivity
 tricolorEnable.addEventListener('change', () => {
   tricolorState.enable = tricolorEnable.checked;
   if (tricolorState.enable) {
@@ -1603,7 +1666,6 @@ cmEnable.addEventListener('change', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
-// Shadow controls
 shadowHue.addEventListener('input', () => {
   tricolorState.shadow.hue = +shadowHue.value;
   shadowHueVal.textContent = tricolorState.shadow.hue + '°';
@@ -1619,7 +1681,6 @@ shadowStr.addEventListener('input', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
-// Midtone controls
 midtoneHue.addEventListener('input', () => {
   tricolorState.midtone.hue = +midtoneHue.value;
   midtoneHueVal.textContent = tricolorState.midtone.hue + '°';
@@ -1635,7 +1696,6 @@ midtoneStr.addEventListener('input', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
-// Highlight controls
 highlightHue.addEventListener('input', () => {
   tricolorState.highlight.hue = +highlightHue.value;
   highlightHueVal.textContent = tricolorState.highlight.hue + '°';
@@ -1651,7 +1711,6 @@ highlightStr.addEventListener('input', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
-// Wheel click handlers
 function handleWheelClick(wheel, type) {
   wheel.addEventListener('click', (e) => {
     const rect = wheel.getBoundingClientRect();
@@ -1713,7 +1772,6 @@ function renderProfiles() {
     const card = document.createElement('div');
     card.className = 'preset-card';
     
-    // Only add share button if NOT imported
     const shareButtonHTML = isImported 
       ? '' 
       : '<button class="preset-share-btn" title="Share preset">📤</button>';
@@ -1727,9 +1785,7 @@ function renderProfiles() {
       <div class="preset-desc">${descText}</div>
     `;
     
-    // Click on card to load preset
     card.addEventListener('click', (e) => {
-      // Don't trigger if clicking action buttons
       if (e.target.classList.contains('preset-share-btn') || 
           e.target.classList.contains('preset-delete-btn')) return;
       
@@ -1739,14 +1795,12 @@ function renderProfiles() {
       applyProfile(name);
     });
     
-    // Delete button functionality
     const deleteBtn = card.querySelector('.preset-delete-btn');
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       deletePreset(name);
     });
     
-    // Share button functionality (only if not imported)
     if (!isImported) {
       const shareBtn = card.querySelector('.preset-share-btn');
       if (shareBtn) {
@@ -1854,18 +1908,13 @@ function deletePreset(presetName) {
     return;
   }
   
-  // Remove from profiles object
   delete profiles[presetName];
-  
-  // Save to localStorage
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
   
-  // If this was the active profile, clear it
   if (activeProfileName === presetName) {
     activeProfileName = null;
   }
   
-  // Refresh UI
   renderProfiles();
 }
 
@@ -1873,24 +1922,20 @@ async function sharePreset(presetName) {
   const preset = profiles[presetName];
   if (!preset) return;
   
-  // Create shareable package
   const sharePackage = {
-    v: 1, // version
-    n: presetName, // name
-    d: preset, // data
-    t: Date.now() // timestamp
+    v: 1,
+    n: presetName,
+    d: preset,
+    t: Date.now()
   };
   
-  // Encode to base64
   const jsonStr = JSON.stringify(sharePackage);
   const encoded = btoa(encodeURIComponent(jsonStr));
   
-  // Copy to clipboard
   try {
     await navigator.clipboard.writeText(encoded);
     alert(`✅ Preset "${presetName}" copied to clipboard!\n\nShare this code with your friend.`);
     
-    // Auto-clear clipboard after 60 seconds
     setTimeout(async () => {
       try {
         const current = await navigator.clipboard.readText();
@@ -1900,7 +1945,6 @@ async function sharePreset(presetName) {
       } catch {}
     }, 60000);
   } catch (err) {
-    // Fallback: show in prompt
     prompt('Copy this preset code:', encoded);
   }
 }
@@ -1912,16 +1956,13 @@ async function importPreset() {
   code = code.trim();
   
   try {
-    // Decode from base64
     const jsonStr = decodeURIComponent(atob(code));
     const sharePackage = JSON.parse(jsonStr);
     
-    // Validate structure
     if (!sharePackage.v || !sharePackage.n || !sharePackage.d) {
       throw new Error('Invalid preset format');
     }
     
-    // Check if preset already exists
     let finalName = sharePackage.n;
     let counter = 1;
     while (profiles[finalName]) {
@@ -1929,19 +1970,15 @@ async function importPreset() {
       counter++;
     }
     
-    // Mark as imported (non-shareable)
     const importedPreset = sharePackage.d;
     importedPreset._imported = true;
     importedPreset._importedAt = Date.now();
     
-    // Save as permanent preset
     profiles[finalName] = importedPreset;
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
     
-    // Refresh UI
     renderProfiles();
     
-    // Clear clipboard
     try {
       await navigator.clipboard.writeText('null');
     } catch {}
@@ -2046,44 +2083,28 @@ self.onmessage = (e) => {
   const useTricolor = tricolorState.enable && film !== 'acros';
   const useHalation = halationState.enable;
 
-  // ========== IMPROVED COLOR SPACE CONVERSIONS ==========
-  
-  // RGB to XYZ (D65 illuminant)
   function rgbToXyz(r, g, b) {
     r = r / 255; g = g / 255; b = b / 255;
-    
-    // Gamma correction (sRGB)
     r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
     g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
     b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-    
-    // Linear RGB to XYZ (D65)
     const x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
     const y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
     const z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
-    
     return [x * 100, y * 100, z * 100];
   }
   
-  // XYZ to LAB
   function xyzToLab(x, y, z) {
-    // D65 reference white
-    x = x / 95.047;
-    y = y / 100.000;
-    z = z / 108.883;
-    
+    x = x / 95.047; y = y / 100.000; z = z / 108.883;
     const fx = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x + 16/116);
     const fy = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y + 16/116);
     const fz = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z + 16/116);
-    
     const L = (116 * fy) - 16;
     const a = 500 * (fx - fy);
     const b = 200 * (fy - fz);
-    
     return [L, a, b];
   }
   
-  // LAB to LCH (Cylindrical LAB)
   function labToLch(L, a, b) {
     const C = Math.sqrt(a * a + b * b);
     let H = Math.atan2(b, a) * (180 / Math.PI);
@@ -2091,7 +2112,6 @@ self.onmessage = (e) => {
     return [L, C, H];
   }
   
-  // LCH to LAB
   function lchToLab(L, C, H) {
     const hRad = H * (Math.PI / 180);
     const a = C * Math.cos(hRad);
@@ -2099,32 +2119,24 @@ self.onmessage = (e) => {
     return [L, a, b];
   }
   
-  // LAB to XYZ
   function labToXyz(L, a, b) {
     let fy = (L + 16) / 116;
     let fx = a / 500 + fy;
     let fz = fy - b / 200;
-    
     const xr = fx * fx * fx > 0.008856 ? fx * fx * fx : (fx - 16/116) / 7.787;
     const yr = fy * fy * fy > 0.008856 ? fy * fy * fy : (fy - 16/116) / 7.787;
     const zr = fz * fz * fz > 0.008856 ? fz * fz * fz : (fz - 16/116) / 7.787;
-    
     return [xr * 95.047, yr * 100.000, zr * 108.883];
   }
   
-  // XYZ to RGB
   function xyzToRgb(x, y, z) {
     x = x / 100; y = y / 100; z = z / 100;
-    
     let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
     let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
     let b = x *  0.0556434 + y * -0.2040259 + z *  1.0572252;
-    
-    // Gamma correction (sRGB)
     r = r > 0.0031308 ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r;
     g = g > 0.0031308 ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g;
     b = b > 0.0031308 ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b;
-    
     return [
       Math.max(0, Math.min(255, Math.round(r * 255))),
       Math.max(0, Math.min(255, Math.round(g * 255))),
@@ -2132,66 +2144,47 @@ self.onmessage = (e) => {
     ];
   }
   
-  // Direct RGB to LCH (convenience)
   function rgbToLch(r, g, b) {
     const [x, y, z] = rgbToXyz(r, g, b);
     const [L, a, bLab] = xyzToLab(x, y, z);
     return labToLch(L, a, bLab);
   }
   
-  // Direct LCH to RGB (convenience)
   function lchToRgb(L, C, H) {
     const [l, a, b] = lchToLab(L, C, H);
     const [x, y, z] = labToXyz(l, a, b);
     return xyzToRgb(x, y, z);
   }
 
-  // ========== IMPROVED COLOR ADJUSTMENT FUNCTIONS ==========
-  
-  // New color ranges (wider, non-overlapping)
   const colorRanges = [
-    { name: 'Red',     center: 0,   width: 40 },   // 340-40°
-    { name: 'Yellow',  center: 60,  width: 40 },   // 40-100°
-    { name: 'Green',   center: 140, width: 60 },   // 100-180°
-    { name: 'Cyan',    center: 190, width: 20 },   // 180-200°
-    { name: 'Blue',    center: 240, width: 60 },   // 200-280°
-    { name: 'Magenta', center: 310, width: 40 }    // 280-340°
+    { name: 'Red', center: 0, width: 40 },
+    { name: 'Yellow', center: 60, width: 40 },
+    { name: 'Green', center: 140, width: 60 },
+    { name: 'Cyan', center: 190, width: 20 },
+    { name: 'Blue', center: 240, width: 60 },
+    { name: 'Magenta', center: 310, width: 40 }
   ];
   
-  // Smooth gaussian-like weight function
   function getColorWeight(hue, center, width) {
     let delta = Math.abs(hue - center);
-    
-    // Handle hue wrapping
     if (delta > 180) delta = 360 - delta;
-    
     const halfWidth = width / 2;
     if (delta > halfWidth) return 0;
-    
-    // Gaussian-like falloff
     const normalized = delta / halfWidth;
     return Math.exp(-2 * normalized * normalized);
   }
   
-  // Map old 8-color indices to new 6-color system
   function getAdjustmentsForHue(hue, cmState) {
-    // Map old color system to new
-    const mapping = [0, 1, 1, 2, 3, 4, 5, 5]; // Red, Orange→Yellow, Yellow, Green, Aqua→Cyan, Blue, Purple→Magenta, Magenta
-    
+    const mapping = [0, 1, 1, 2, 3, 4, 5, 5];
     let totalSat = 0, totalLum = 0, totalWeight = 0;
-    
     for (let i = 0; i < colorRanges.length; i++) {
       const range = colorRanges[i];
       const weight = getColorWeight(hue, range.center, range.width);
-      
       if (weight > 0.01) {
-        // Find which old color indices map to this range
         const oldIndices = [];
         for (let j = 0; j < mapping.length; j++) {
           if (mapping[j] === i) oldIndices.push(j);
         }
-        
-        // Average adjustments from mapped old colors
         let avgS = 0, avgL = 0;
         for (const idx of oldIndices) {
           avgS += cmState.dS[idx] || 0;
@@ -2199,88 +2192,45 @@ self.onmessage = (e) => {
         }
         avgS /= oldIndices.length;
         avgL /= oldIndices.length;
-        
         totalSat += avgS * weight;
         totalLum += avgL * weight;
         totalWeight += weight;
       }
     }
-    
     if (totalWeight > 0) {
-      return {
-        sat: totalSat / totalWeight,
-        lum: totalLum / totalWeight
-      };
+      return { sat: totalSat / totalWeight, lum: totalLum / totalWeight };
     }
-    
     return { sat: 0, lum: 0 };
   }
 
-  // ========== PERLIN NOISE FOR FILM GRAIN ==========
-  
-  // Perlin noise generator for structured film grain
   function perlinNoise(x, y, scale, octaves) {
-    let value = 0;
-    let amplitude = 1;
-    let frequency = scale;
-    let maxValue = 0;
-    
+    let value = 0, amplitude = 1, frequency = scale, maxValue = 0;
     for (let i = 0; i < octaves; i++) {
-      const sampleX = x * frequency;
-      const sampleY = y * frequency;
-      
-      // Grid coordinates
-      const x0 = Math.floor(sampleX);
-      const x1 = x0 + 1;
-      const y0 = Math.floor(sampleY);
-      const y1 = y0 + 1;
-      
-      // Interpolation weights
-      const sx = sampleX - x0;
-      const sy = sampleY - y0;
-      
-      // Gradient vectors (pseudo-random)
+      const sampleX = x * frequency, sampleY = y * frequency;
+      const x0 = Math.floor(sampleX), x1 = x0 + 1, y0 = Math.floor(sampleY), y1 = y0 + 1;
+      const sx = sampleX - x0, sy = sampleY - y0;
       const hash = (x, y) => {
         let h = x * 374761393 + y * 668265263;
         h = (h ^ (h >>> 13)) * 1274126177;
         return ((h ^ (h >>> 16)) & 0x7fffffff) / 0x7fffffff * 2 - 1;
       };
-      
-      const g00 = hash(x0, y0);
-      const g10 = hash(x1, y0);
-      const g01 = hash(x0, y1);
-      const g11 = hash(x1, y1);
-      
-      // Interpolate
+      const g00 = hash(x0, y0), g10 = hash(x1, y0), g01 = hash(x0, y1), g11 = hash(x1, y1);
       const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
-      const u = fade(sx);
-      const v = fade(sy);
-      
-      const nx0 = g00 * (1 - u) + g10 * u;
-      const nx1 = g01 * (1 - u) + g11 * u;
+      const u = fade(sx), v = fade(sy);
+      const nx0 = g00 * (1 - u) + g10 * u, nx1 = g01 * (1 - u) + g11 * u;
       const nxy = nx0 * (1 - v) + nx1 * v;
-      
       value += nxy * amplitude;
       maxValue += amplitude;
-      
       amplitude *= 0.5;
       frequency *= 2;
     }
-    
     return value / maxValue;
   }
 
   const W = imageData.width, H = imageData.height;
   const cx = W * 0.5, cy = H * 0.5;
-  
-  // Elliptical vignette setup (follows aspect ratio)
-  const aspectRatio = W / H;
   const radiusX = (W * 0.5) * vignetteSize;
   const radiusY = (H * 0.5) * vignetteSize;
-  
-  // Diagonal distance for proper corner coverage
-  const maxDist = Math.sqrt(W * W + H * H) * 0.5;
-  
   const vigPower = (vignetteAmt||0) / 100;
   const featherPower = vignetteFeather || 2.0;
 
@@ -2289,63 +2239,42 @@ self.onmessage = (e) => {
       const i = (y*W + x) * 4;
       let r = d[i], g = d[i+1], bl = d[i+2];
 
-      // ========== STEP 1: EXPOSURE COMPENSATION (IN LINEAR SPACE) ==========
       if (exposureComp !== 0) {
-        // Convert to linear space for proper exposure
         const toLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4);
         const toGamma = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-        
-        let rLin = toLinear(r);
-        let gLin = toLinear(g);
-        let bLin = toLinear(bl);
-        
-        // Apply exposure as stops (2^stops)
+        let rLin = toLinear(r), gLin = toLinear(g), bLin = toLinear(bl);
         const multiplier = Math.pow(2, exposureComp);
-        rLin *= multiplier;
-        gLin *= multiplier;
-        bLin *= multiplier;
-        
+        rLin *= multiplier; gLin *= multiplier; bLin *= multiplier;
         r = Math.max(0, Math.min(255, toGamma(rLin) * 255));
         g = Math.max(0, Math.min(255, toGamma(gLin) * 255));
         bl = Math.max(0, Math.min(255, toGamma(bLin) * 255));
       }
 
-      // ========== STEP 2: WHITE BALANCE (LAB SPACE) ==========
       if (wb.r !== 0 || wb.g !== 0 || wb.b !== 0) {
         let [L, C, H] = rgbToLch(r, g, bl);
         const [labL, labA, labB] = lchToLab(L, C, H);
-        
         const aShift = (wb.r - wb.g) * 3;
         const bShift = (wb.b - (wb.r + wb.g) * 0.5) * 3;
-        
         const newA = labA + aShift;
         const newB = labB + bShift;
-        
         [L, C, H] = labToLch(labL, newA, newB);
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // ========== STEP 3: TONE CURVE (HIGHLIGHT/SHADOW) ==========
       if (highlightAdj !== 0 || shadowAdj !== 0) {
         let [L, C, H] = rgbToLch(r, g, bl);
-        
-        // Shadow adjustment (affects 0-30% luminance)
         if (shadowAdj !== 0 && L < 30) {
-          const shadowStrength = (30 - L) / 30;  // 1.0 at L=0, 0.0 at L=30
+          const shadowStrength = (30 - L) / 30;
           L = L * (1 + shadowAdj * 0.15 * shadowStrength);
         }
-        
-        // Highlight adjustment (affects 70-100% luminance)
         if (highlightAdj !== 0 && L > 70) {
-          const highlightStrength = (L - 70) / 30;  // 0.0 at L=70, 1.0 at L=100
+          const highlightStrength = (L - 70) / 30;
           L = L * (1 + highlightAdj * 0.15 * highlightStrength);
         }
-        
         L = Math.max(0, Math.min(100, L));
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // ========== STEP 4: FILM SIMULATION BASE ==========
       if (film === 'acros'){
         const a = (r+g+bl)/3;
         r=g=bl=a;
@@ -2356,80 +2285,51 @@ self.onmessage = (e) => {
         bl = bl*.85 + a*.15;
       }
 
-      // ========== STEP 5: PER-COLOR ADJUSTMENTS (LCH) ==========
       if (useColorMix){
         let [L, C, H] = rgbToLch(r, g, bl);
-        
         if (C > 5) {
           const adj = getAdjustmentsForHue(H, cmState);
           const chromaMultiplier = 1 + (adj.sat * 0.8);
           C = Math.max(0, Math.min(130, C * chromaMultiplier));
           L = Math.max(0, Math.min(100, L + adj.lum * 40));
         }
-        
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // ========== STEP 6: COLOR CHROME EFFECT ==========
-      // Deepens already-saturated colors (reds, yellows, greens)
       if (colorChrome > 0) {
         let [L, C, H] = rgbToLch(r, g, bl);
-        
-        // Only affect already-vibrant colors (C > 40)
         if (C > 40) {
-          const strength = colorChrome === 1 ? 0.3 : 0.6; // Weak or Strong
-          
-          // Boost chroma more for reds/yellows/greens
+          const strength = colorChrome === 1 ? 0.3 : 0.6;
           let colorBoost = 1.0;
-          if ((H >= 0 && H <= 60) || (H >= 330 && H <= 360)) {
-            // Reds
-            colorBoost = 1.4;
-          } else if (H >= 40 && H <= 80) {
-            // Yellows
-            colorBoost = 1.2;
-          } else if (H >= 80 && H <= 160) {
-            // Greens
-            colorBoost = 1.15;
-          }
-          
+          if ((H >= 0 && H <= 60) || (H >= 330 && H <= 360)) colorBoost = 1.4;
+          else if (H >= 40 && H <= 80) colorBoost = 1.2;
+          else if (H >= 80 && H <= 160) colorBoost = 1.15;
           const saturationFactor = Math.pow((C - 40) / 90, 0.6);
           C = C + saturationFactor * strength * 35 * colorBoost;
-          
-          // Slightly darken to "deepen" the tone
           L = L * (1 - saturationFactor * strength * 0.08);
         }
-        
         C = Math.max(0, Math.min(130, C));
         L = Math.max(0, Math.min(100, L));
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // ========== STEP 7: COLOR CHROME FX BLUE ==========
-      // Specifically deepens blues (polarizer-like effect)
       if (colorChromeBlue > 0) {
         let [L, C, H] = rgbToLch(r, g, bl);
-        
-        // Target blue hues (200-260°) with saturation
         if (H >= 200 && H <= 260 && C > 20) {
           const strength = colorChromeBlue === 1 ? 0.4 : 0.7;
-          const blueStrength = 1 - Math.abs(H - 230) / 30;  // Peak at 230°
-          
+          const blueStrength = 1 - Math.abs(H - 230) / 30;
           C = C * (1 + strength * blueStrength * 0.5);
-          L = L * (1 - strength * blueStrength * 0.12);  // Darken for depth
+          L = L * (1 - strength * blueStrength * 0.12);
         }
-        
         C = Math.max(0, Math.min(130, C));
         L = Math.max(0, Math.min(100, L));
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // ========== STEP 8: TRICOLOR GRADING (LCH) ==========
       if (useTricolor){
         let [L, C, H] = rgbToLch(r, g, bl);
-        
         const lumNorm = L / 100;
         let shadowWeight = 0, midtoneWeight = 0, highlightWeight = 0;
-        
         if (lumNorm < 0.5) {
           shadowWeight = Math.exp(-8 * (lumNorm - 0.15) * (lumNorm - 0.15));
           midtoneWeight = Math.exp(-8 * (lumNorm - 0.4) * (lumNorm - 0.4));
@@ -2437,99 +2337,67 @@ self.onmessage = (e) => {
           midtoneWeight = Math.exp(-8 * (lumNorm - 0.6) * (lumNorm - 0.6));
           highlightWeight = Math.exp(-8 * (lumNorm - 0.85) * (lumNorm - 0.85));
         }
-        
         const totalWeight = shadowWeight + midtoneWeight + highlightWeight;
         if (totalWeight > 0) {
           shadowWeight /= totalWeight;
           midtoneWeight /= totalWeight;
           highlightWeight /= totalWeight;
         }
-        
-        let hueShift = 0;
-        let chromaBoost = 0;
-        
+        let hueShift = 0, chromaBoost = 0;
         if (shadowWeight > 0.1 && tricolorState.shadow.strength > 0) {
           const strength = (tricolorState.shadow.strength / 100) * shadowWeight;
           const targetHue = tricolorState.shadow.hue;
-          
           let hueDelta = targetHue - H;
           if (hueDelta > 180) hueDelta -= 360;
           if (hueDelta < -180) hueDelta += 360;
-          
           hueShift += hueDelta * strength * 0.3;
           chromaBoost += strength * 20;
         }
-        
         if (midtoneWeight > 0.1 && tricolorState.midtone.strength > 0) {
           const strength = (tricolorState.midtone.strength / 100) * midtoneWeight;
           const targetHue = tricolorState.midtone.hue;
-          
           let hueDelta = targetHue - H;
           if (hueDelta > 180) hueDelta -= 360;
           if (hueDelta < -180) hueDelta += 360;
-          
           hueShift += hueDelta * strength * 0.3;
           chromaBoost += strength * 20;
         }
-        
         if (highlightWeight > 0.1 && tricolorState.highlight.strength > 0) {
           const strength = (tricolorState.highlight.strength / 100) * highlightWeight;
           const targetHue = tricolorState.highlight.hue;
-          
           let hueDelta = targetHue - H;
           if (hueDelta > 180) hueDelta -= 360;
           if (hueDelta < -180) hueDelta += 360;
-          
           hueShift += hueDelta * strength * 0.3;
           chromaBoost += strength * 20;
         }
-        
         H = (H + hueShift + 360) % 360;
         C = Math.max(0, Math.min(130, C + chromaBoost));
-        
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      // ========== STEP 9: FILM GRAIN (PERLIN NOISE) ==========
       if (grainAmt > 0){
         const normalizedGrain = grainAmt / 50;
         const actualIntensity = Math.pow(normalizedGrain, 1.8) * 15;
-        
-        // Grain size determines scale (1=small, 2=medium, 3=large)
-        const scaleMap = [0, 0.015, 0.008, 0.004];  // Smaller scale = finer grain
+        const scaleMap = [0, 0.015, 0.008, 0.004];
         const scale = scaleMap[grainSize] || 0.008;
-        const octaves = grainSize === 1 ? 3 : 2;  // More octaves for small grain
-        
-        // Generate Perlin noise for each channel with slight offset
+        const octaves = grainSize === 1 ? 3 : 2;
         const rNoise = perlinNoise(x + 1000, y, scale, octaves) * actualIntensity;
         const gNoise = perlinNoise(x + 2000, y, scale, octaves) * actualIntensity;
         const bNoise = perlinNoise(x + 3000, y, scale, octaves) * actualIntensity;
-        
-        // Luminance-dependent: more visible in midtones
         const lum = (r + g + bl) / 3;
         const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.5;
-        
         r += rNoise * lumFactor;
         g += gNoise * lumFactor;
         bl += bNoise * lumFactor;
       }
 
-      // ========== STEP 10: VIGNETTE (ELLIPTICAL, QUARTIC) ==========
       if (vigPower > 0){
-        const dx = x - cx;
-        const dy = y - cy;
-        
-        // Elliptical distance (normalized to 0-1)
-        const distX = dx / radiusX;
-        const distY = dy / radiusY;
+        const dx = x - cx, dy = y - cy;
+        const distX = dx / radiusX, distY = dy / radiusY;
         const ellipticalDist = Math.sqrt(distX * distX + distY * distY);
-        
-        // Quartic falloff (cos^4 law for natural lens vignetting)
-        // featherPower controls how gradual the transition is (2-6)
         const fall = Math.min(1, Math.max(0, ellipticalDist));
         const vignetteFactor = 1 - vigPower * Math.pow(fall, featherPower);
-        
-        // Apply vignette
         r *= vignetteFactor;
         g *= vignetteFactor;
         bl *= vignetteFactor;
@@ -2541,10 +2409,8 @@ self.onmessage = (e) => {
     }
   }
 
-  // Apply halation effect (after all other processing)
   if (useHalation) {
     const { blur, strength, threshold } = halationState;
-    
     const brightPixels = new Uint8ClampedArray(d.length);
     for (let i = 0; i < d.length; i += 4) {
       const brightness = (d[i] + d[i+1] + d[i+2]) / 3;
@@ -2555,10 +2421,8 @@ self.onmessage = (e) => {
         brightPixels[i+3] = 255;
       }
     }
-    
     const blurRadius = Math.max(1, Math.round(blur));
     const blurred = new Uint8ClampedArray(brightPixels.length);
-    
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         let sumR = 0, sumG = 0, sumB = 0, count = 0;
@@ -2578,7 +2442,6 @@ self.onmessage = (e) => {
         blurred[idx + 2] = sumB / count;
       }
     }
-    
     const blurred2 = new Uint8ClampedArray(blurred.length);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -2599,7 +2462,6 @@ self.onmessage = (e) => {
         blurred2[idx + 2] = sumB / count;
       }
     }
-    
     for (let i = 0; i < blurred2.length; i += 4) {
       if (blurred2[i] > 0 || blurred2[i+1] > 0 || blurred2[i+2] > 0) {
         const brightness = (blurred2[i] + blurred2[i+1] + blurred2[i+2]) / 3;
@@ -2608,7 +2470,6 @@ self.onmessage = (e) => {
         blurred2[i+2] = 0;
       }
     }
-    
     const finalBlurred = new Uint8ClampedArray(blurred2.length);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -2625,7 +2486,6 @@ self.onmessage = (e) => {
         finalBlurred[idx] = sumR / count;
       }
     }
-    
     const finalBlurred2 = new Uint8ClampedArray(finalBlurred.length);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -2642,7 +2502,6 @@ self.onmessage = (e) => {
         finalBlurred2[idx] = sumR / count;
       }
     }
-    
     for (let i = 0; i < d.length; i += 4) {
       const halationR = finalBlurred2[i];
       if (halationR > 0) {
@@ -2650,7 +2509,6 @@ self.onmessage = (e) => {
         const origG = d[i+1] / 255;
         const origB = d[i+2] / 255;
         const halR = halationR / 255;
-        
         d[i] = Math.min(255, (1 - (1 - origR) * (1 - halR)) * 255);
         d[i+1] = Math.min(255, (1 - (1 - origG) * (1 - halR)) * 255);
         d[i+2] = Math.min(255, (1 - (1 - origB) * (1 - halR)) * 255);
@@ -2699,7 +2557,6 @@ async function shoot() {
   textBtn.style.display = 'flex';
   saveBtn.style.display = 'flex';
   
-  // Close bottom sheet when taking photo
   sheetExpanded = false;
   bottomSheet.classList.remove('expanded');
 
@@ -2791,12 +2648,10 @@ document.getElementById('text-cancel').addEventListener('click', () => {
 document.getElementById('text-submit').addEventListener('click', async () => {
   userText = textInput.value.trim();
   if (userText) {
-    // Ensure font is loaded before drawing
     if (document.fonts) {
       await document.fonts.load('131px "Mistrully"').catch(() => {});
     }
     updateText();
-    // Show font size controls ONLY when text is applied
     document.getElementById('font-size-controls').style.display = 'flex';
   }
   textModal.style.display = 'none';
@@ -2806,9 +2661,7 @@ document.getElementById('text-submit').addEventListener('click', async () => {
 function updateText() {
   if (!dim) return;
   const ctx = canvas.getContext('2d');
-  // Restore the processed image WITHOUT text
   if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
-  // Draw text fresh on top
   drawText(ctx);
 }
 
@@ -2816,14 +2669,12 @@ function drawText(ctx) {
   if (!userText || !dim) return;
   const { fw, fh, bot } = dim;
   
-  // Ensure font is loaded before drawing
   if (document.fonts) {
     document.fonts.load(`${currentFontSize}px "Mistrully"`).catch(() => {});
   }
   
   ctx.font = `${currentFontSize}px "Mistrully", cursive`;
   
-  // Auto-shrink if text is too wide
   let fs = currentFontSize;
   while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
     fs--;
@@ -2843,11 +2694,11 @@ nextBtn.addEventListener('click', () => {
   nextBtn.style.display = 'none';
   textBtn.style.display = 'none';
   saveBtn.style.display = 'none';
-  document.getElementById('font-size-controls').style.display = 'none'; // Hide controls
+  document.getElementById('font-size-controls').style.display = 'none';
   lastFrameImageData = null;
   dim = null;
   userText = '';
-  currentFontSize = 131; // Reset font size
+  currentFontSize = 131;
 });
 
 /* ========== SAVE ========== */
@@ -2911,7 +2762,6 @@ document.getElementById('gallery-close').addEventListener('click', () => {
   document.getElementById('gallery-overlay').style.display = 'none';
 });
 
-// Font size controls
 document.getElementById('increase-font').addEventListener('click', () => {
   if (userText && currentFontSize < 200) {
     currentFontSize += 5;
@@ -2928,9 +2778,23 @@ document.getElementById('decrease-font').addEventListener('click', () => {
   
 /* ========== INIT ========== */
 loadProfiles();
+
+// Apply Filmic A preset values directly on startup
+film = 'kodachrome';
+shadowAdj = 1.4;
+wb = { r: -2, g: 2, b: 3 };
+halationState = { enable: true, blur: 17, strength: 27, threshold: 221 };
+
+// Update UI to match Filmic A defaults
+shadowSlider.value = shadowAdj;
+shadowVal.textContent = '+' + shadowAdj.toFixed(1);
+wbRSlider.value = wb.r; wbRVal.textContent = wb.r;
+wbGSlider.value = wb.g; wbGVal.textContent = wb.g;
+wbBSlider.value = wb.b; wbBVal.textContent = wb.b;
+updateHalationUI();
+
 bootCam();
 
-// Prevent context menu except on photo
 document.addEventListener('contextmenu', e => {
   if (e.target.id !== 'photo') e.preventDefault();
 }, { passive: false });
