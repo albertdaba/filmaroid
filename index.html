@@ -2934,35 +2934,7 @@ async function loadLUT() {
 /* ========== INIT ========== */
 loadProfiles();
 
-// Load LUT then start camera
-loadLUT().then(() => {
-  bootCam();
-});
-```
-
-## 3. File structure in your GitHub repo
-```
-/
-├── index.html
-├── lut-data.js        ← your LUT goes here
-├── manifest.json
-├── mistrully.ttf
-├── icon-192.png
-/* ========== INIT ========== */
-loadProfiles();
-
-// Initialize LUT
-lutSize = EMBEDDED_LUT_SIZE;
-lut3D = EMBEDDED_LUT_DATA;
-
-// All settings start neutral (no Filmic A defaults)
-bootCam();
-
-document.addEventListener('contextmenu', e => {
-  if (e.target.id !== 'photo') e.preventDefault();
-}, { passive: false });
-
-/* ========== LOAD SAVED LUT STATE ========== */
+// Restore saved LUT enabled state
 try {
   const savedLutEnabled = localStorage.getItem('lutEnabledV1');
   if (savedLutEnabled !== null) {
@@ -2970,6 +2942,16 @@ try {
     document.getElementById('lut-enable').checked = lutEnabled;
   }
 } catch {}
+
+// Prevent context menu except on photo
+document.addEventListener('contextmenu', e => {
+  if (e.target.id !== 'photo') e.preventDefault();
+}, { passive: false });
+
+// Load LUT then start camera
+loadLUT().then(() => {
+  bootCam();
+});
 </script>
 
 </body>
