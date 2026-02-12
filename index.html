@@ -717,7 +717,6 @@ select {
     <button id="increase-font">+</button>
   </div>
   <button id="camera-switch">📷</button>
-  <button id="gallery-btn">Gallery</button>
   <button id="next-btn" style="display:none;">↩</button>
 </div>
   
@@ -2849,29 +2848,6 @@ saveBtn.addEventListener('click', () => {
     fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result);
     fr.readAsDataURL(blob);
   }, 'image/jpeg', jpegQ / 100);
-});
-
-/* ========== GALLERY ========== */
-document.getElementById('gallery-btn').addEventListener('click', () => {
-  const content = document.getElementById('gallery-content');
-  content.innerHTML = '';
-  
-  const keys = Object.keys(localStorage)
-    .filter(k => k.startsWith('saved-photo-'))
-    .sort()
-    .reverse();
-  
-  if (!keys.length) {
-    content.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">No saved images</p>';
-  } else {
-    keys.forEach(k => {
-      const img = document.createElement('img');
-      img.src = localStorage.getItem(k);
-      content.appendChild(img);
-    });
-  }
-  
-  document.getElementById('gallery-overlay').style.display = 'flex';
 });
 
 document.getElementById('gallery-close').addEventListener('click', () => {
