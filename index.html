@@ -129,7 +129,7 @@ canvas, #photo {
 
 #next-btn {
   position: absolute;
-  right: 20px;
+  right: 10px;
 }
     
 #menu-trigger, #save-btn, #text-btn {
@@ -2333,28 +2333,10 @@ self.onmessage = (e) => {
     return { sat: 0, lum: 0 };
   }
 
-  function perlinNoise(x, y, scale, octaves) {
-    let value = 0, amplitude = 1, frequency = scale, maxValue = 0;
-    for (let i = 0; i < octaves; i++) {
-      const sampleX = x * frequency, sampleY = y * frequency;
-      const x0 = Math.floor(sampleX), x1 = x0 + 1, y0 = Math.floor(sampleY), y1 = y0 + 1;
-      const sx = sampleX - x0, sy = sampleY - y0;
-      const hash = (x, y) => {
-        let h = x * 374761393 + y * 668265263;
-        h = (h ^ (h >>> 13)) * 1274126177;
-        return ((h ^ (h >>> 16)) & 0x7fffffff) / 0x7fffffff * 2 - 1;
-      };
-      const g00 = hash(x0, y0), g10 = hash(x1, y0), g01 = hash(x0, y1), g11 = hash(x1, y1);
-      const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
-      const u = fade(sx), v = fade(sy);
-      const nx0 = g00 * (1 - u) + g10 * u, nx1 = g01 * (1 - u) + g11 * u;
-      const nxy = nx0 * (1 - v) + nx1 * v;
-      value += nxy * amplitude;
-      maxValue += amplitude;
-      amplitude *= 0.5;
-      frequency *= 2;
-    }
-    return value / maxValue;
+function filmGrain(x, y, seed) {
+    let n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.3) * 43758.5453;
+    n = n - Math.floor(n);
+    return n * 2.0 - 1.0;
   }
 
   const W = imageData.width, H = imageData.height;
@@ -2506,20 +2488,23 @@ self.onmessage = (e) => {
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-      if (grainAmt > 0){
+if (grainAmt > 0){
         const normalizedGrain = grainAmt / 50;
-        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 15;
-        const scaleMap = [0, 0.015, 0.008, 0.004];
-        const scale = scaleMap[grainSize] || 0.008;
-        const octaves = grainSize === 1 ? 3 : 2;
-        const noise = perlinNoise(x + 1000, y, scale, octaves) * actualIntensity;
+        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 18;
+        const sizeSeeds = [0, 1.0, 3.0, 7.0];
+        const spread = sizeSeeds[grainSize] || 3.0;
+        const gx = Math.floor(x / (grainSize === 1 ? 1 : grainSize === 2 ? 1 : 2));
+        const gy = Math.floor(y / (grainSize === 1 ? 1 : grainSize === 2 ? 1 : 2));
+        const noise = filmGrain(gx, gy, spread);
         const lum = (r + g + bl) / 3;
-        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.5;
-        r += noise * lumFactor;
-        g += noise * lumFactor;
-        bl += noise * lumFactor;
+        const lumNorm = lum / 255;
+        // Shadows get more grain, highlights get less — like real film
+        const lumFactor = 0.8 + (1.0 - lumNorm) * 0.6;
+        r += noise * actualIntensity * lumFactor;
+        g += noise * actualIntensity * lumFactor;
+        bl += noise * actualIntensity * lumFactor;
       }
-
+      
       if (vigPower > 0){
         const dx = x - cx, dy = y - cy;
         const distX = dx / radiusX, distY = dy / radiusY;
