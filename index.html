@@ -127,7 +127,13 @@ canvas, #photo {
   transform: scale(0.95);
 }
 
-#menu-trigger, #next-btn, #save-btn, #text-btn {
+#next-btn {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+    
+#menu-trigger, #save-btn, #text-btn {
   width: 50px;
   height: 50px;
   border-radius: 50%;
@@ -712,6 +718,7 @@ select {
     <button id="decrease-font">-</button>
     <button id="increase-font">+</button>
   </div>
+  <button id="next-btn" style="display:none;">↩</button>
   <button id="gallery-btn">Gallery</button>
 </div>
   
@@ -720,7 +727,6 @@ select {
   <button id="menu-trigger">☰</button>
   <button id="shutter"></button>
   <button id="save-btn">💾</button>
-  <button id="next-btn">↩</button>
   <button id="text-btn">T</button>
 </div>
 
