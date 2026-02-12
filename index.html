@@ -585,6 +585,7 @@ select {
   font-size: 16px;
   user-select: auto;
   -webkit-user-select: auto;
+  -webkit-user-modify: read-write;
 }
 
 #text-modal .modal-buttons {
@@ -1067,7 +1068,7 @@ select {
 
 <!-- Text Modal -->
 <div id="text-modal">
-  <input type="text" id="text-input" maxlength="50" placeholder="Enter text for photo" style="font-size: 14px;">
+  <input type="text" id="text-input" maxlength="50" placeholder="Enter text for photo" style="font-size: 16px;" autocomplete="off" autocorrect="off">
   <div class="modal-buttons">
     <button id="text-cancel" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; padding: 10px;">Cancel</button>
     <button id="text-submit" style="background: #007aff; color: #fff; font-size: 14px; padding: 10px;">Add Text</button>
@@ -2752,7 +2753,10 @@ const textInput = document.getElementById('text-input');
 
 textBtn.addEventListener('click', () => {
   textModal.style.display = 'flex';
-  textInput.focus();
+  setTimeout(() => {
+    textInput.focus();
+    textInput.click();
+  }, 100);
 });
 
 document.getElementById('text-cancel').addEventListener('click', () => {
