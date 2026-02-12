@@ -2489,21 +2489,18 @@ function filmGrain(x, y, seed) {
       }
 
 if (grainAmt > 0){
-        const normalizedGrain = grainAmt / 50;
-        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 18;
-        const sizeSeeds = [0, 1.0, 3.0, 7.0];
-        const spread = sizeSeeds[grainSize] || 3.0;
-        const gx = Math.floor(x / (grainSize === 1 ? 1 : grainSize === 2 ? 1 : 2));
-        const gy = Math.floor(y / (grainSize === 1 ? 1 : grainSize === 2 ? 1 : 2));
-        const noise = filmGrain(gx, gy, spread);
-        const lum = (r + g + bl) / 3;
-        const lumNorm = lum / 255;
-        // Shadows get more grain, highlights get less — like real film
-        const lumFactor = 0.8 + (1.0 - lumNorm) * 0.6;
-        r += noise * actualIntensity * lumFactor;
-        g += noise * actualIntensity * lumFactor;
-        bl += noise * actualIntensity * lumFactor;
-      }
+  const normalizedGrain = grainAmt / 50;
+  const actualIntensity = Math.pow(normalizedGrain, 1.8) * 18;
+  const sizeMultiplier = grainSize === 1 ? 0.6 : grainSize === 2 ? 1.0 : 1.5;
+  const n = (Math.sin(x * 127.1 + y * 311.7) * 43758.5453 % 1 + 1) % 1 * 2 - 1;
+  const lum = (r + g + bl) / 3;
+  const lumNorm = lum / 255;
+  const lumFactor = 0.8 + (1.0 - lumNorm) * 0.6;
+  const grainVal = n * actualIntensity * lumFactor * sizeMultiplier;
+  r += grainVal;
+  g += grainVal;
+  bl += grainVal;
+}
       
       if (vigPower > 0){
         const dx = x - cx, dy = y - cy;
