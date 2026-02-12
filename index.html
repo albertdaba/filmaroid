@@ -741,7 +741,7 @@ select {
     <!-- PRESETS TAB -->
     <div class="tab-panel active" id="presets-panel">
  <div id="preset-grid">
-  <div class="preset-card active" data-preset="filmic-a">
+  <div class="preset-card" data-preset="filmic-a">
     <div class="preset-name">Filmic A</div>
     <div class="preset-desc">Warm halation</div>
   </div>
@@ -839,19 +839,19 @@ select {
       
       <div class="divider"></div>
       
+      <div class="toggle-section">
+        <input type="checkbox" id="lut-enable" checked>
+        <label for="lut-enable">LUT (Analog Film Look)</label>
+      </div>
+      
+      <div class="divider"></div>
+      
       <div class="control-group">
         <div class="control-label">
           <span>JPEG Quality</span>
           <span class="control-value" id="jpeg-quality-val">60%</span>
         </div>
         <input type="range" id="jpeg-quality" min="20" max="100" value="60">
-      </div>
-      
-      <div class="divider"></div>
-      
-      <div class="toggle-section">
-        <input type="checkbox" id="lut-enable" checked>
-        <label for="lut-enable">Analog LUT (Film Look)</label>
       </div>
       
       <div class="divider"></div>
@@ -1103,7 +1103,7 @@ const sheetHandle = document.getElementById('sheet-handle');
 let stream = null;
 let grainAmt = 0;
 let grainSize = 2;
-let film = 'kodachrome';
+let film = 'none';
 let jpegQ = 60;
 let userText = '';
 let dim = null;
@@ -1158,13 +1158,10 @@ let halationState = {
   threshold: 200
 };
 
-const LUT_KEY = 'lutSettingsV1';
-let lutState = {
-  enable: true
-};
-
+/* ========== LUT STATE ========== */
 let lut3D = null;
 let lutSize = 0;
+let lutEnabled = true;
 
 /* ========== LOAD SAVED SETTINGS ========== */
 try {
@@ -1200,11 +1197,6 @@ try {
 try {
   const savedHalation = JSON.parse(localStorage.getItem(HALATION_KEY));
   if (savedHalation) halationState = savedHalation;
-} catch {}
-
-try {
-  const savedLUT = JSON.parse(localStorage.getItem(LUT_KEY));
-  if (savedLUT !== null && typeof savedLUT.enable === 'boolean') lutState = savedLUT;
 } catch {}
 
 /* ========== TABS ========== */
@@ -1420,6 +1412,14 @@ jpegSlider.addEventListener('input', () => {
   jpegVal.textContent = jpegQ + '%';
 });
 
+/* ========== LUT TOGGLE ========== */
+const lutEnableCheckbox = document.getElementById('lut-enable');
+lutEnableCheckbox.addEventListener('change', () => {
+  lutEnabled = lutEnableCheckbox.checked;
+  localStorage.setItem('lutEnabledV1', String(lutEnabled));
+  if (lastFrameImageData) shootReprocess();
+});
+
 const wbRSlider = document.getElementById('wb-r');
 const wbRVal = document.getElementById('wb-r-val');
 wbRSlider.addEventListener('input', () => {
@@ -1526,27 +1526,6 @@ halationThreshold.addEventListener('input', () => {
   saveHalationState();
   if (lastFrameImageData) shootReprocess();
 });
-
-/* ========== LUT ========== */
-const lutEnable = document.getElementById('lut-enable');
-
-function updateLUTUI() {
-  if (lutEnable) {
-    lutEnable.checked = lutState.enable;
-  }
-}
-
-function saveLUTState() {
-  localStorage.setItem(LUT_KEY, JSON.stringify(lutState));
-}
-
-if (lutEnable) {
-  lutEnable.addEventListener('change', () => {
-    lutState.enable = lutEnable.checked;
-    saveLUTState();
-    if (lastFrameImageData) shootReprocess();
-  });
-}
 
 /* ========== COLOR MIX ========== */
 const cmEnable = document.getElementById('cm-enable');
@@ -1860,7 +1839,7 @@ function applyProfile(name) {
   const p = profiles[name];
   if (!p) return;
   
-  film = p.filmBase || 'kodachrome';
+  film = p.filmBase || 'none';
   grainAmt = p.grainAmt || 0;
   grainSize = p.grainSize || 2;
   exposureComp = p.exposureComp || 0;
@@ -2115,7 +2094,806 @@ document.getElementById('camera-switch').addEventListener('click', () => {
   selector.style.display = 'flex';
 });
 
-/* ========== EMBEDDED LUT DATA ========== */
+/* ========== 3D LUT APPLICATION ========== */
+function apply3DLUT(imageData) {
+  if (!lut3D || lutSize === 0) return;
+  
+  const data = imageData.data;
+  const size = lutSize;
+  const maxIndex = size - 1;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i] / 255;
+    let g = data[i + 1] / 255;
+    let b = data[i + 2] / 255;
+    
+    // Clamp input
+    r = Math.max(0, Math.min(1, r));
+    g = Math.max(0, Math.min(1, g));
+    b = Math.max(0, Math.min(1, b));
+    
+    // Map to LUT space
+    const rPos = r * maxIndex;
+    const gPos = g * maxIndex;
+    const bPos = b * maxIndex;
+    
+    // Get surrounding cube vertices
+    const r0 = Math.floor(rPos);
+    const r1 = Math.min(r0 + 1, maxIndex);
+    const g0 = Math.floor(gPos);
+    const g1 = Math.min(g0 + 1, maxIndex);
+    const b0 = Math.floor(bPos);
+    const b1 = Math.min(b0 + 1, maxIndex);
+    
+    // Interpolation factors
+    const rFrac = rPos - r0;
+    const gFrac = gPos - g0;
+    const bFrac = bPos - b0;
+    
+    // Sample 8 corners of the cube (RGB order: r varies fastest, then g, then b)
+    const c000 = lut3D[r0 * size * size + g0 * size + b0];
+    const c001 = lut3D[r1 * size * size + g0 * size + b0];
+    const c010 = lut3D[r0 * size * size + g1 * size + b0];
+    const c011 = lut3D[r1 * size * size + g1 * size + b0];
+    const c100 = lut3D[r0 * size * size + g0 * size + b1];
+    const c101 = lut3D[r1 * size * size + g0 * size + b1];
+    const c110 = lut3D[r0 * size * size + g1 * size + b1];
+    const c111 = lut3D[r1 * size * size + g1 * size + b1];
+    
+    // Trilinear interpolation
+    const c00 = [
+      c000[0] * (1 - rFrac) + c001[0] * rFrac,
+      c000[1] * (1 - rFrac) + c001[1] * rFrac,
+      c000[2] * (1 - rFrac) + c001[2] * rFrac
+    ];
+    const c01 = [
+      c010[0] * (1 - rFrac) + c011[0] * rFrac,
+      c010[1] * (1 - rFrac) + c011[1] * rFrac,
+      c010[2] * (1 - rFrac) + c011[2] * rFrac
+    ];
+    const c10 = [
+      c100[0] * (1 - rFrac) + c101[0] * rFrac,
+      c100[1] * (1 - rFrac) + c101[1] * rFrac,
+      c100[2] * (1 - rFrac) + c101[2] * rFrac
+    ];
+    const c11 = [
+      c110[0] * (1 - rFrac) + c111[0] * rFrac,
+      c110[1] * (1 - rFrac) + c111[1] * rFrac,
+      c110[2] * (1 - rFrac) + c111[2] * rFrac
+    ];
+    
+    const c0 = [
+      c00[0] * (1 - gFrac) + c01[0] * gFrac,
+      c00[1] * (1 - gFrac) + c01[1] * gFrac,
+      c00[2] * (1 - gFrac) + c01[2] * gFrac
+    ];
+    const c1 = [
+      c10[0] * (1 - gFrac) + c11[0] * gFrac,
+      c10[1] * (1 - gFrac) + c11[1] * gFrac,
+      c10[2] * (1 - gFrac) + c11[2] * gFrac
+    ];
+    
+    const result = [
+      c0[0] * (1 - bFrac) + c1[0] * bFrac,
+      c0[1] * (1 - bFrac) + c1[1] * bFrac,
+      c0[2] * (1 - bFrac) + c1[2] * bFrac
+    ];
+    
+    // Write back
+    data[i] = Math.round(result[0] * 255);
+    data[i + 1] = Math.round(result[1] * 255);
+    data[i + 2] = Math.round(result[2] * 255);
+  }
+}
+
+/* ========== WORKER ========== */
+const workerSrc = `
+self.onmessage = (e) => {
+  const { imageData, film, grainAmt, grainSize, exposureComp, highlightAdj, shadowAdj, colorChrome, colorChromeBlue, cmState, colors, hueWidth, wb, vignetteAmt, vignetteSize, vignetteFeather, tricolorState, halationState } = e.data;
+  const d = imageData.data;
+  const useColorMix = cmState.enable && film !== 'acros';
+  const useTricolor = tricolorState.enable && film !== 'acros';
+  const useHalation = halationState.enable;
+
+  function rgbToXyz(r, g, b) {
+    r = r / 255; g = g / 255; b = b / 255;
+    r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+    g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+    b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+    const x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
+    const y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
+    const z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
+    return [x * 100, y * 100, z * 100];
+  }
+  
+  function xyzToLab(x, y, z) {
+    x = x / 95.047; y = y / 100.000; z = z / 108.883;
+    const fx = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x + 16/116);
+    const fy = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y + 16/116);
+    const fz = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z + 16/116);
+    const L = (116 * fy) - 16;
+    const a = 500 * (fx - fy);
+    const b = 200 * (fy - fz);
+    return [L, a, b];
+  }
+  
+  function labToLch(L, a, b) {
+    const C = Math.sqrt(a * a + b * b);
+    let H = Math.atan2(b, a) * (180 / Math.PI);
+    if (H < 0) H += 360;
+    return [L, C, H];
+  }
+  
+  function lchToLab(L, C, H) {
+    const hRad = H * (Math.PI / 180);
+    const a = C * Math.cos(hRad);
+    const b = C * Math.sin(hRad);
+    return [L, a, b];
+  }
+  
+  function labToXyz(L, a, b) {
+    let fy = (L + 16) / 116;
+    let fx = a / 500 + fy;
+    let fz = fy - b / 200;
+    const xr = fx * fx * fx > 0.008856 ? fx * fx * fx : (fx - 16/116) / 7.787;
+    const yr = fy * fy * fy > 0.008856 ? fy * fy * fy : (fy - 16/116) / 7.787;
+    const zr = fz * fz * fz > 0.008856 ? fz * fz * fz : (fz - 16/116) / 7.787;
+    return [xr * 95.047, yr * 100.000, zr * 108.883];
+  }
+  
+  function xyzToRgb(x, y, z) {
+    x = x / 100; y = y / 100; z = z / 100;
+    let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
+    let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
+    let b = x *  0.0556434 + y * -0.2040259 + z *  1.0572252;
+    r = r > 0.0031308 ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r;
+    g = g > 0.0031308 ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g;
+    b = b > 0.0031308 ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b;
+    return [
+      Math.max(0, Math.min(255, Math.round(r * 255))),
+      Math.max(0, Math.min(255, Math.round(g * 255))),
+      Math.max(0, Math.min(255, Math.round(b * 255)))
+    ];
+  }
+  
+  function rgbToLch(r, g, b) {
+    const [x, y, z] = rgbToXyz(r, g, b);
+    const [L, a, bLab] = xyzToLab(x, y, z);
+    return labToLch(L, a, bLab);
+  }
+  
+  function lchToRgb(L, C, H) {
+    const [l, a, b] = lchToLab(L, C, H);
+    const [x, y, z] = labToXyz(l, a, b);
+    return xyzToRgb(x, y, z);
+  }
+
+  const colorRanges = [
+    { name: 'Red', center: 0, width: 40 },
+    { name: 'Yellow', center: 60, width: 40 },
+    { name: 'Green', center: 140, width: 60 },
+    { name: 'Cyan', center: 190, width: 20 },
+    { name: 'Blue', center: 240, width: 60 },
+    { name: 'Magenta', center: 310, width: 40 }
+  ];
+  
+  function getColorWeight(hue, center, width) {
+    let delta = Math.abs(hue - center);
+    if (delta > 180) delta = 360 - delta;
+    const halfWidth = width / 2;
+    if (delta > halfWidth) return 0;
+    const normalized = delta / halfWidth;
+    return Math.exp(-2 * normalized * normalized);
+  }
+  
+  function getAdjustmentsForHue(hue, cmState) {
+    const mapping = [0, 1, 1, 2, 3, 4, 5, 5];
+    let totalSat = 0, totalLum = 0, totalWeight = 0;
+    for (let i = 0; i < colorRanges.length; i++) {
+      const range = colorRanges[i];
+      const weight = getColorWeight(hue, range.center, range.width);
+      if (weight > 0.01) {
+        const oldIndices = [];
+        for (let j = 0; j < mapping.length; j++) {
+          if (mapping[j] === i) oldIndices.push(j);
+        }
+        let avgS = 0, avgL = 0;
+        for (const idx of oldIndices) {
+          avgS += cmState.dS[idx] || 0;
+          avgL += cmState.dL[idx] || 0;
+        }
+        avgS /= oldIndices.length;
+        avgL /= oldIndices.length;
+        totalSat += avgS * weight;
+        totalLum += avgL * weight;
+        totalWeight += weight;
+      }
+    }
+    if (totalWeight > 0) {
+      return { sat: totalSat / totalWeight, lum: totalLum / totalWeight };
+    }
+    return { sat: 0, lum: 0 };
+  }
+
+  function perlinNoise(x, y, scale, octaves) {
+    let value = 0, amplitude = 1, frequency = scale, maxValue = 0;
+    for (let i = 0; i < octaves; i++) {
+      const sampleX = x * frequency, sampleY = y * frequency;
+      const x0 = Math.floor(sampleX), x1 = x0 + 1, y0 = Math.floor(sampleY), y1 = y0 + 1;
+      const sx = sampleX - x0, sy = sampleY - y0;
+      const hash = (x, y) => {
+        let h = x * 374761393 + y * 668265263;
+        h = (h ^ (h >>> 13)) * 1274126177;
+        return ((h ^ (h >>> 16)) & 0x7fffffff) / 0x7fffffff * 2 - 1;
+      };
+      const g00 = hash(x0, y0), g10 = hash(x1, y0), g01 = hash(x0, y1), g11 = hash(x1, y1);
+      const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+      const u = fade(sx), v = fade(sy);
+      const nx0 = g00 * (1 - u) + g10 * u, nx1 = g01 * (1 - u) + g11 * u;
+      const nxy = nx0 * (1 - v) + nx1 * v;
+      value += nxy * amplitude;
+      maxValue += amplitude;
+      amplitude *= 0.5;
+      frequency *= 2;
+    }
+    return value / maxValue;
+  }
+
+  const W = imageData.width, H = imageData.height;
+  const cx = W * 0.5, cy = H * 0.5;
+  const radiusX = (W * 0.5) * vignetteSize;
+  const radiusY = (H * 0.5) * vignetteSize;
+  const vigPower = (vignetteAmt||0) / 100;
+  const featherPower = vignetteFeather || 2.0;
+
+  for (let y=0; y<H; y++){
+    for (let x=0; x<W; x++){
+      const i = (y*W + x) * 4;
+      let r = d[i], g = d[i+1], bl = d[i+2];
+
+      if (exposureComp !== 0) {
+        const toLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4);
+        const toGamma = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+        let rLin = toLinear(r), gLin = toLinear(g), bLin = toLinear(bl);
+        const multiplier = Math.pow(2, exposureComp);
+        rLin *= multiplier; gLin *= multiplier; bLin *= multiplier;
+        r = Math.max(0, Math.min(255, toGamma(rLin) * 255));
+        g = Math.max(0, Math.min(255, toGamma(gLin) * 255));
+        bl = Math.max(0, Math.min(255, toGamma(bLin) * 255));
+      }
+
+      if (wb.r !== 0 || wb.g !== 0 || wb.b !== 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        const [labL, labA, labB] = lchToLab(L, C, H);
+        const aShift = (wb.r - wb.g) * 3;
+        const bShift = (wb.b - (wb.r + wb.g) * 0.5) * 3;
+        const newA = labA + aShift;
+        const newB = labB + bShift;
+        [L, C, H] = labToLch(labL, newA, newB);
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      if (highlightAdj !== 0 || shadowAdj !== 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        if (shadowAdj !== 0 && L < 30) {
+          const shadowStrength = (30 - L) / 30;
+          L = L * (1 + shadowAdj * 0.15 * shadowStrength);
+        }
+        if (highlightAdj !== 0 && L > 70) {
+          const highlightStrength = (L - 70) / 30;
+          L = L * (1 + highlightAdj * 0.15 * highlightStrength);
+        }
+        L = Math.max(0, Math.min(100, L));
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      if (film === 'acros'){
+        const a = (r+g+bl)/3;
+        r=g=bl=a;
+      } else if (film !== 'none') {
+        const a = (r+g+bl)/3;
+        r = r*.85 + a*.15;
+        g = g*.85 + a*.15;
+        bl = bl*.85 + a*.15;
+      }
+
+      if (useColorMix){
+        let [L, C, H] = rgbToLch(r, g, bl);
+        if (C > 5) {
+          const adj = getAdjustmentsForHue(H, cmState);
+          const chromaMultiplier = 1 + (adj.sat * 0.8);
+          C = Math.max(0, Math.min(130, C * chromaMultiplier));
+          L = Math.max(0, Math.min(100, L + adj.lum * 40));
+        }
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      if (colorChrome > 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        if (C > 40) {
+          const strength = colorChrome === 1 ? 0.3 : 0.6;
+          let colorBoost = 1.0;
+          if ((H >= 0 && H <= 60) || (H >= 330 && H <= 360)) colorBoost = 1.4;
+          else if (H >= 40 && H <= 80) colorBoost = 1.2;
+          else if (H >= 80 && H <= 160) colorBoost = 1.15;
+          const saturationFactor = Math.pow((C - 40) / 90, 0.6);
+          C = C + saturationFactor * strength * 35 * colorBoost;
+          L = L * (1 - saturationFactor * strength * 0.08);
+        }
+        C = Math.max(0, Math.min(130, C));
+        L = Math.max(0, Math.min(100, L));
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      if (colorChromeBlue > 0) {
+        let [L, C, H] = rgbToLch(r, g, bl);
+        if (H >= 200 && H <= 260 && C > 20) {
+          const strength = colorChromeBlue === 1 ? 0.4 : 0.7;
+          const blueStrength = 1 - Math.abs(H - 230) / 30;
+          C = C * (1 + strength * blueStrength * 0.5);
+          L = L * (1 - strength * blueStrength * 0.12);
+        }
+        C = Math.max(0, Math.min(130, C));
+        L = Math.max(0, Math.min(100, L));
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      if (useTricolor){
+        let [L, C, H] = rgbToLch(r, g, bl);
+        const lumNorm = L / 100;
+        let shadowWeight = 0, midtoneWeight = 0, highlightWeight = 0;
+        if (lumNorm < 0.5) {
+          shadowWeight = Math.exp(-8 * (lumNorm - 0.15) * (lumNorm - 0.15));
+          midtoneWeight = Math.exp(-8 * (lumNorm - 0.4) * (lumNorm - 0.4));
+        } else {
+          midtoneWeight = Math.exp(-8 * (lumNorm - 0.6) * (lumNorm - 0.6));
+          highlightWeight = Math.exp(-8 * (lumNorm - 0.85) * (lumNorm - 0.85));
+        }
+        const totalWeight = shadowWeight + midtoneWeight + highlightWeight;
+        if (totalWeight > 0) {
+          shadowWeight /= totalWeight;
+          midtoneWeight /= totalWeight;
+          highlightWeight /= totalWeight;
+        }
+        let hueShift = 0, chromaBoost = 0;
+        if (shadowWeight > 0.1 && tricolorState.shadow.strength > 0) {
+          const strength = (tricolorState.shadow.strength / 100) * shadowWeight;
+          const targetHue = tricolorState.shadow.hue;
+          let hueDelta = targetHue - H;
+          if (hueDelta > 180) hueDelta -= 360;
+          if (hueDelta < -180) hueDelta += 360;
+          hueShift += hueDelta * strength * 0.3;
+          chromaBoost += strength * 20;
+        }
+        if (midtoneWeight > 0.1 && tricolorState.midtone.strength > 0) {
+          const strength = (tricolorState.midtone.strength / 100) * midtoneWeight;
+          const targetHue = tricolorState.midtone.hue;
+          let hueDelta = targetHue - H;
+          if (hueDelta > 180) hueDelta -= 360;
+          if (hueDelta < -180) hueDelta += 360;
+          hueShift += hueDelta * strength * 0.3;
+          chromaBoost += strength * 20;
+        }
+        if (highlightWeight > 0.1 && tricolorState.highlight.strength > 0) {
+          const strength = (tricolorState.highlight.strength / 100) * highlightWeight;
+          const targetHue = tricolorState.highlight.hue;
+          let hueDelta = targetHue - H;
+          if (hueDelta > 180) hueDelta -= 360;
+          if (hueDelta < -180) hueDelta += 360;
+          hueShift += hueDelta * strength * 0.3;
+          chromaBoost += strength * 20;
+        }
+        H = (H + hueShift + 360) % 360;
+        C = Math.max(0, Math.min(130, C + chromaBoost));
+        [r, g, bl] = lchToRgb(L, C, H);
+      }
+
+      if (grainAmt > 0){
+        const normalizedGrain = grainAmt / 50;
+        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 15;
+        const scaleMap = [0, 0.015, 0.008, 0.004];
+        const scale = scaleMap[grainSize] || 0.008;
+        const octaves = grainSize === 1 ? 3 : 2;
+        const rNoise = perlinNoise(x + 1000, y, scale, octaves) * actualIntensity;
+        const gNoise = perlinNoise(x + 2000, y, scale, octaves) * actualIntensity;
+        const bNoise = perlinNoise(x + 3000, y, scale, octaves) * actualIntensity;
+        const lum = (r + g + bl) / 3;
+        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.5;
+        r += rNoise * lumFactor;
+        g += gNoise * lumFactor;
+        bl += bNoise * lumFactor;
+      }
+
+      if (vigPower > 0){
+        const dx = x - cx, dy = y - cy;
+        const distX = dx / radiusX, distY = dy / radiusY;
+        const ellipticalDist = Math.sqrt(distX * distX + distY * distY);
+        const fall = Math.min(1, Math.max(0, ellipticalDist));
+        const vignetteFactor = 1 - vigPower * Math.pow(fall, featherPower);
+        r *= vignetteFactor;
+        g *= vignetteFactor;
+        bl *= vignetteFactor;
+      }
+
+      d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
+      d[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
+      d[i+2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
+    }
+  }
+
+  if (useHalation) {
+    const { blur, strength, threshold } = halationState;
+    const brightPixels = new Uint8ClampedArray(d.length);
+    for (let i = 0; i < d.length; i += 4) {
+      const brightness = (d[i] + d[i+1] + d[i+2]) / 3;
+      if (brightness >= threshold) {
+        brightPixels[i] = 255;
+        brightPixels[i+1] = 255;
+        brightPixels[i+2] = 255;
+        brightPixels[i+3] = 255;
+      }
+    }
+    const blurRadius = Math.max(1, Math.round(blur));
+    const blurred = new Uint8ClampedArray(brightPixels.length);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
+          const nx = x + dx;
+          if (nx >= 0 && nx < W) {
+            const idx = (y * W + nx) * 4;
+            sumR += brightPixels[idx];
+            sumG += brightPixels[idx + 1];
+            sumB += brightPixels[idx + 2];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        blurred[idx] = sumR / count;
+        blurred[idx + 1] = sumG / count;
+        blurred[idx + 2] = sumB / count;
+      }
+    }
+    const blurred2 = new Uint8ClampedArray(blurred.length);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
+          const ny = y + dy;
+          if (ny >= 0 && ny < H) {
+            const idx = (ny * W + x) * 4;
+            sumR += blurred[idx];
+            sumG += blurred[idx + 1];
+            sumB += blurred[idx + 2];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        blurred2[idx] = sumR / count;
+        blurred2[idx + 1] = sumG / count;
+        blurred2[idx + 2] = sumB / count;
+      }
+    }
+    for (let i = 0; i < blurred2.length; i += 4) {
+      if (blurred2[i] > 0 || blurred2[i+1] > 0 || blurred2[i+2] > 0) {
+        const brightness = (blurred2[i] + blurred2[i+1] + blurred2[i+2]) / 3;
+        blurred2[i] = Math.min(255, brightness + strength);
+        blurred2[i+1] = 0;
+        blurred2[i+2] = 0;
+      }
+    }
+    const finalBlurred = new Uint8ClampedArray(blurred2.length);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, count = 0;
+        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
+          const nx = x + dx;
+          if (nx >= 0 && nx < W) {
+            const idx = (y * W + nx) * 4;
+            sumR += blurred2[idx];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        finalBlurred[idx] = sumR / count;
+      }
+    }
+    const finalBlurred2 = new Uint8ClampedArray(finalBlurred.length);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sumR = 0, count = 0;
+        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
+          const ny = y + dy;
+          if (ny >= 0 && ny < H) {
+            const idx = (ny * W + x) * 4;
+            sumR += finalBlurred[idx];
+            count++;
+          }
+        }
+        const idx = (y * W + x) * 4;
+        finalBlurred2[idx] = sumR / count;
+      }
+    }
+    for (let i = 0; i < d.length; i += 4) {
+      const halationR = finalBlurred2[i];
+      if (halationR > 0) {
+        const origR = d[i] / 255;
+        const origG = d[i+1] / 255;
+        const origB = d[i+2] / 255;
+        const halR = halationR / 255;
+        d[i] = Math.min(255, (1 - (1 - origR) * (1 - halR)) * 255);
+        d[i+1] = Math.min(255, (1 - (1 - origG) * (1 - halR)) * 255);
+        d[i+2] = Math.min(255, (1 - (1 - origB) * (1 - halR)) * 255);
+      }
+    }
+  }
+
+  self.postMessage({ imageData }, [imageData.data.buffer]);
+};
+`;
+const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], {type: 'application/javascript'})));
+
+/* ========== SHOOT ========== */
+shutter.addEventListener('click', () => {
+  userText = '';
+  shoot();
+});
+
+async function shoot() {
+  if (!video.videoWidth) {
+    alert('Wait for camera');
+    return;
+  }
+
+  document.getElementById('font-size-controls').style.display = 'none';
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  const b = Math.floor(Math.min(w, h) * 0.09);
+  const fw = w + b * 2;
+  const bot = b * 2;
+  const fh = h + b + bot;
+
+  canvas.width = fw;
+  canvas.height = fh;
+  dim = { fw, fh, b, bot };
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, fw, fh);
+  ctx.drawImage(video, b, b, w, h);
+
+  canvas.style.display = 'block';
+  video.style.display = 'none';
+  nextBtn.style.display = 'flex';
+  textBtn.style.display = 'flex';
+  saveBtn.style.display = 'flex';
+  
+  sheetExpanded = false;
+  bottomSheet.classList.remove('expanded');
+
+  const roi = ctx.getImageData(b, b, w, h);
+  processingEl.style.display = 'flex';
+
+  worker.postMessage({
+    imageData: roi,
+    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
+    grainAmt,
+    grainSize,
+    exposureComp,
+    highlightAdj,
+    shadowAdj,
+    colorChrome,
+    colorChromeBlue,
+    cmState,
+    colors,
+    hueWidth,
+    wb,
+    vignetteAmt,
+    vignetteSize,
+    vignetteFeather,
+    tricolorState,
+    halationState
+  }, [roi.data.buffer]);
+
+  worker.onmessage = (e) => {
+    const { imageData } = e.data;
+    if (lutEnabled && lut3D && lutSize > 0) {
+      apply3DLUT(imageData);
+    }
+    ctx.putImageData(imageData, b, b);
+    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
+    drawText(ctx);
+    processingEl.style.display = 'none';
+  };
+}
+
+function shootReprocess() {
+  if (!dim) return;
+  const { fw, fh, b, bot } = dim;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const roi = ctx.getImageData(b, b, canvas.width - b * 2, canvas.height - b * 2 - (bot - b));
+  
+  processingEl.style.display = 'flex';
+
+  worker.postMessage({
+    imageData: roi,
+    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
+    grainAmt,
+    grainSize,
+    exposureComp,
+    highlightAdj,
+    shadowAdj,
+    colorChrome,
+    colorChromeBlue,
+    cmState,
+    colors,
+    hueWidth,
+    wb,
+    vignetteAmt,
+    vignetteSize,
+    vignetteFeather,
+    tricolorState,
+    halationState
+  }, [roi.data.buffer]);
+
+  worker.onmessage = (e) => {
+    const { imageData } = e.data;
+    if (lutEnabled && lut3D && lutSize > 0) {
+      apply3DLUT(imageData);
+    }
+    ctx.putImageData(imageData, b, b);
+    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
+    drawText(ctx);
+    processingEl.style.display = 'none';
+  };
+}
+
+/* ========== TEXT ========== */
+const textModal = document.getElementById('text-modal');
+const textInput = document.getElementById('text-input');
+
+textBtn.addEventListener('click', () => {
+  textModal.style.display = 'flex';
+  textInput.focus();
+});
+
+document.getElementById('text-cancel').addEventListener('click', () => {
+  textModal.style.display = 'none';
+  textInput.value = '';
+});
+
+document.getElementById('text-submit').addEventListener('click', async () => {
+  userText = textInput.value.trim();
+  if (userText) {
+    if (document.fonts) {
+      await document.fonts.load('131px "Mistrully"').catch(() => {});
+    }
+    updateText();
+    document.getElementById('font-size-controls').style.display = 'flex';
+  }
+  textModal.style.display = 'none';
+  textInput.value = '';
+});
+
+function updateText() {
+  if (!dim) return;
+  const ctx = canvas.getContext('2d');
+  if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
+  drawText(ctx);
+}
+
+function drawText(ctx) {
+  if (!userText || !dim) return;
+  const { fw, fh, bot } = dim;
+  
+  if (document.fonts) {
+    document.fonts.load(`${currentFontSize}px "Mistrully"`).catch(() => {});
+  }
+  
+  ctx.font = `${currentFontSize}px "Mistrully", cursive`;
+  
+  let fs = currentFontSize;
+  while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
+    fs--;
+    ctx.font = `${fs}px "Mistrully", cursive`;
+  }
+  
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(userText, fw / 2, fh - bot / 2);
+}
+
+/* ========== NEXT/RESET ========== */
+nextBtn.addEventListener('click', () => {
+  video.style.display = 'block';
+  canvas.style.display = 'none';
+  nextBtn.style.display = 'none';
+  textBtn.style.display = 'none';
+  saveBtn.style.display = 'none';
+  document.getElementById('font-size-controls').style.display = 'none';
+  lastFrameImageData = null;
+  dim = null;
+  userText = '';
+  currentFontSize = 131;
+});
+
+/* ========== SAVE ========== */
+saveBtn.addEventListener('click', () => {
+  if (!dim) {
+    alert('Take a photo first');
+    return;
+  }
+  
+  const { fw, fh } = dim;
+  const scale = 1810 / 4420;
+  const tmp = document.createElement('canvas');
+  
+  tmp.width = Math.floor(fw * scale);
+  tmp.height = Math.floor(fh * scale);
+  const tctx = tmp.getContext('2d');
+  tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
+  
+  tmp.toBlob(blob => {
+    if (!blob) {
+      alert('Save failed');
+      return;
+    }
+    
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `photo-${Date.now()}.jpg`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    
+    const fr = new FileReader();
+    fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result);
+    fr.readAsDataURL(blob);
+  }, 'image/jpeg', jpegQ / 100);
+});
+
+/* ========== GALLERY ========== */
+document.getElementById('gallery-btn').addEventListener('click', () => {
+  const content = document.getElementById('gallery-content');
+  content.innerHTML = '';
+  
+  const keys = Object.keys(localStorage)
+    .filter(k => k.startsWith('saved-photo-'))
+    .sort()
+    .reverse();
+  
+  if (!keys.length) {
+    content.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">No saved images</p>';
+  } else {
+    keys.forEach(k => {
+      const img = document.createElement('img');
+      img.src = localStorage.getItem(k);
+      content.appendChild(img);
+    });
+  }
+  
+  document.getElementById('gallery-overlay').style.display = 'flex';
+});
+
+document.getElementById('gallery-close').addEventListener('click', () => {
+  document.getElementById('gallery-overlay').style.display = 'none';
+});
+
+document.getElementById('increase-font').addEventListener('click', () => {
+  if (userText && currentFontSize < 200) {
+    currentFontSize += 5;
+    updateText();
+  }
+});
+
+document.getElementById('decrease-font').addEventListener('click', () => {
+  if (userText && currentFontSize > 20) {
+    currentFontSize -= 5;
+    updateText();
+  }
+});
+  
 const EMBEDDED_LUT_DATA = [
   [0.000000, 0.000000, 0.000000],
   [0.000000, 0.000000, 0.000000],
@@ -38055,797 +38833,31 @@ const EMBEDDED_LUT_DATA = [
   [0.941176, 0.960784, 0.941176],
   [0.945098, 0.964706, 0.964706]
 ];
+
 const EMBEDDED_LUT_SIZE = 33;
 
-/* ========== 3D LUT LOADING ========== */
-async function loadLUT() {
-  lutSize = EMBEDDED_LUT_SIZE;
-  lut3D = EMBEDDED_LUT_DATA;
-  console.log(`LUT loaded: ${lutSize}³ = ${lut3D.length} entries`);
-}
-
-/* ========== WORKER ========== */
-const workerSrc = `
-self.onmessage = (e) => {
-  const { imageData, film, grainAmt, grainSize, exposureComp, highlightAdj, shadowAdj, colorChrome, colorChromeBlue, cmState, colors, hueWidth, wb, vignetteAmt, vignetteSize, vignetteFeather, tricolorState, halationState, lutState, lut3D, lutSize } = e.data;
-  const d = imageData.data;
-  const useColorMix = cmState.enable && film !== 'acros';
-  const useTricolor = tricolorState.enable && film !== 'acros';
-  const useHalation = halationState.enable;
-  const useLUT = lutState && lutState.enable && lut3D && lutSize > 0;
-
-  function rgbToXyz(r, g, b) {
-    r = r / 255; g = g / 255; b = b / 255;
-    r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-    g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-    b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-    const x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
-    const y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
-    const z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
-    return [x * 100, y * 100, z * 100];
-  }
-  
-  function xyzToLab(x, y, z) {
-    x = x / 95.047; y = y / 100.000; z = z / 108.883;
-    const fx = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x + 16/116);
-    const fy = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y + 16/116);
-    const fz = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z + 16/116);
-    const L = (116 * fy) - 16;
-    const a = 500 * (fx - fy);
-    const b = 200 * (fy - fz);
-    return [L, a, b];
-  }
-  
-  function labToLch(L, a, b) {
-    const C = Math.sqrt(a * a + b * b);
-    let H = Math.atan2(b, a) * (180 / Math.PI);
-    if (H < 0) H += 360;
-    return [L, C, H];
-  }
-  
-  function lchToLab(L, C, H) {
-    const hRad = H * (Math.PI / 180);
-    const a = C * Math.cos(hRad);
-    const b = C * Math.sin(hRad);
-    return [L, a, b];
-  }
-  
-  function labToXyz(L, a, b) {
-    let fy = (L + 16) / 116;
-    let fx = a / 500 + fy;
-    let fz = fy - b / 200;
-    const xr = fx * fx * fx > 0.008856 ? fx * fx * fx : (fx - 16/116) / 7.787;
-    const yr = fy * fy * fy > 0.008856 ? fy * fy * fy : (fy - 16/116) / 7.787;
-    const zr = fz * fz * fz > 0.008856 ? fz * fz * fz : (fz - 16/116) / 7.787;
-    return [xr * 95.047, yr * 100.000, zr * 108.883];
-  }
-  
-  function xyzToRgb(x, y, z) {
-    x = x / 100; y = y / 100; z = z / 100;
-    let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
-    let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
-    let b = x *  0.0556434 + y * -0.2040259 + z *  1.0572252;
-    r = r > 0.0031308 ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r;
-    g = g > 0.0031308 ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g;
-    b = b > 0.0031308 ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b;
-    return [
-      Math.max(0, Math.min(255, Math.round(r * 255))),
-      Math.max(0, Math.min(255, Math.round(g * 255))),
-      Math.max(0, Math.min(255, Math.round(b * 255)))
-    ];
-  }
-  
-  function rgbToLch(r, g, b) {
-    const [x, y, z] = rgbToXyz(r, g, b);
-    const [L, a, bLab] = xyzToLab(x, y, z);
-    return labToLch(L, a, bLab);
-  }
-  
-  function lchToRgb(L, C, H) {
-    const [l, a, b] = lchToLab(L, C, H);
-    const [x, y, z] = labToXyz(l, a, b);
-    return xyzToRgb(x, y, z);
-  }
-
-  function apply3DLUT(imageData, lut3D, lutSize) {
-    if (!lut3D || lutSize === 0) return;
-    const data = imageData.data;
-    const size = lutSize;
-    const maxIndex = size - 1;
-    for (let i = 0; i < data.length; i += 4) {
-      let r = data[i] / 255;
-      let g = data[i + 1] / 255;
-      let b = data[i + 2] / 255;
-      r = Math.max(0, Math.min(1, r));
-      g = Math.max(0, Math.min(1, g));
-      b = Math.max(0, Math.min(1, b));
-      const rPos = r * maxIndex;
-      const gPos = g * maxIndex;
-      const bPos = b * maxIndex;
-      const r0 = Math.floor(rPos);
-      const r1 = Math.min(r0 + 1, maxIndex);
-      const g0 = Math.floor(gPos);
-      const g1 = Math.min(g0 + 1, maxIndex);
-      const b0 = Math.floor(bPos);
-      const b1 = Math.min(b0 + 1, maxIndex);
-      const rFrac = rPos - r0;
-      const gFrac = gPos - g0;
-      const bFrac = bPos - b0;
-      const c000 = lut3D[r0 * size * size + g0 * size + b0];
-      const c001 = lut3D[r1 * size * size + g0 * size + b0];
-      const c010 = lut3D[r0 * size * size + g1 * size + b0];
-      const c011 = lut3D[r1 * size * size + g1 * size + b0];
-      const c100 = lut3D[r0 * size * size + g0 * size + b1];
-      const c101 = lut3D[r1 * size * size + g0 * size + b1];
-      const c110 = lut3D[r0 * size * size + g1 * size + b1];
-      const c111 = lut3D[r1 * size * size + g1 * size + b1];
-      const c00 = [c000[0]*(1-rFrac)+c001[0]*rFrac, c000[1]*(1-rFrac)+c001[1]*rFrac, c000[2]*(1-rFrac)+c001[2]*rFrac];
-      const c01 = [c010[0]*(1-rFrac)+c011[0]*rFrac, c010[1]*(1-rFrac)+c011[1]*rFrac, c010[2]*(1-rFrac)+c011[2]*rFrac];
-      const c10 = [c100[0]*(1-rFrac)+c101[0]*rFrac, c100[1]*(1-rFrac)+c101[1]*rFrac, c100[2]*(1-rFrac)+c101[2]*rFrac];
-      const c11 = [c110[0]*(1-rFrac)+c111[0]*rFrac, c110[1]*(1-rFrac)+c111[1]*rFrac, c110[2]*(1-rFrac)+c111[2]*rFrac];
-      const c0 = [c00[0]*(1-gFrac)+c01[0]*gFrac, c00[1]*(1-gFrac)+c01[1]*gFrac, c00[2]*(1-gFrac)+c01[2]*gFrac];
-      const c1 = [c10[0]*(1-gFrac)+c11[0]*gFrac, c10[1]*(1-gFrac)+c11[1]*gFrac, c10[2]*(1-gFrac)+c11[2]*gFrac];
-      const result = [c0[0]*(1-bFrac)+c1[0]*bFrac, c0[1]*(1-bFrac)+c1[1]*bFrac, c0[2]*(1-bFrac)+c1[2]*bFrac];
-      data[i] = Math.round(result[0] * 255);
-      data[i + 1] = Math.round(result[1] * 255);
-      data[i + 2] = Math.round(result[2] * 255);
-    }
-  }
-
-  const colorRanges = [
-    { name: 'Red', center: 0, width: 40 },
-    { name: 'Yellow', center: 60, width: 40 },
-    { name: 'Green', center: 140, width: 60 },
-    { name: 'Cyan', center: 190, width: 20 },
-    { name: 'Blue', center: 240, width: 60 },
-    { name: 'Magenta', center: 310, width: 40 }
-  ];
-  
-  function getColorWeight(hue, center, width) {
-    let delta = Math.abs(hue - center);
-    if (delta > 180) delta = 360 - delta;
-    const halfWidth = width / 2;
-    if (delta > halfWidth) return 0;
-    const normalized = delta / halfWidth;
-    return Math.exp(-2 * normalized * normalized);
-  }
-  
-  function getAdjustmentsForHue(hue, cmState) {
-    const mapping = [0, 1, 1, 2, 3, 4, 5, 5];
-    let totalSat = 0, totalLum = 0, totalWeight = 0;
-    for (let i = 0; i < colorRanges.length; i++) {
-      const range = colorRanges[i];
-      const weight = getColorWeight(hue, range.center, range.width);
-      if (weight > 0.01) {
-        const oldIndices = [];
-        for (let j = 0; j < mapping.length; j++) {
-          if (mapping[j] === i) oldIndices.push(j);
-        }
-        let avgS = 0, avgL = 0;
-        for (const idx of oldIndices) {
-          avgS += cmState.dS[idx] || 0;
-          avgL += cmState.dL[idx] || 0;
-        }
-        avgS /= oldIndices.length;
-        avgL /= oldIndices.length;
-        totalSat += avgS * weight;
-        totalLum += avgL * weight;
-        totalWeight += weight;
-      }
-    }
-    if (totalWeight > 0) {
-      return { sat: totalSat / totalWeight, lum: totalLum / totalWeight };
-    }
-    return { sat: 0, lum: 0 };
-  }
-
-  function perlinNoise(x, y, scale, octaves) {
-    let value = 0, amplitude = 1, frequency = scale, maxValue = 0;
-    for (let i = 0; i < octaves; i++) {
-      const sampleX = x * frequency, sampleY = y * frequency;
-      const x0 = Math.floor(sampleX), x1 = x0 + 1, y0 = Math.floor(sampleY), y1 = y0 + 1;
-      const sx = sampleX - x0, sy = sampleY - y0;
-      const hash = (x, y) => {
-        let h = x * 374761393 + y * 668265263;
-        h = (h ^ (h >>> 13)) * 1274126177;
-        return ((h ^ (h >>> 16)) & 0x7fffffff) / 0x7fffffff * 2 - 1;
-      };
-      const g00 = hash(x0, y0), g10 = hash(x1, y0), g01 = hash(x0, y1), g11 = hash(x1, y1);
-      const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
-      const u = fade(sx), v = fade(sy);
-      const nx0 = g00 * (1 - u) + g10 * u, nx1 = g01 * (1 - u) + g11 * u;
-      const nxy = nx0 * (1 - v) + nx1 * v;
-      value += nxy * amplitude;
-      maxValue += amplitude;
-      amplitude *= 0.5;
-      frequency *= 2;
-    }
-    return value / maxValue;
-  }
-
-  const W = imageData.width, H = imageData.height;
-  const cx = W * 0.5, cy = H * 0.5;
-  const radiusX = (W * 0.5) * vignetteSize;
-  const radiusY = (H * 0.5) * vignetteSize;
-  const vigPower = (vignetteAmt||0) / 100;
-  const featherPower = vignetteFeather || 2.0;
-
-  if (useLUT) {
-    apply3DLUT(imageData, lut3D, lutSize);
-  }
-
-  for (let y=0; y<H; y++){
-    for (let x=0; x<W; x++){
-      const i = (y*W + x) * 4;
-      let r = d[i], g = d[i+1], bl = d[i+2];
-
-      if (exposureComp !== 0) {
-        const toLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4);
-        const toGamma = c => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-        let rLin = toLinear(r), gLin = toLinear(g), bLin = toLinear(bl);
-        const multiplier = Math.pow(2, exposureComp);
-        rLin *= multiplier; gLin *= multiplier; bLin *= multiplier;
-        r = Math.max(0, Math.min(255, toGamma(rLin) * 255));
-        g = Math.max(0, Math.min(255, toGamma(gLin) * 255));
-        bl = Math.max(0, Math.min(255, toGamma(bLin) * 255));
-      }
-
-      if (wb.r !== 0 || wb.g !== 0 || wb.b !== 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        const [labL, labA, labB] = lchToLab(L, C, H);
-        const aShift = (wb.r - wb.g) * 3;
-        const bShift = (wb.b - (wb.r + wb.g) * 0.5) * 3;
-        const newA = labA + aShift;
-        const newB = labB + bShift;
-        [L, C, H] = labToLch(labL, newA, newB);
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      if (highlightAdj !== 0 || shadowAdj !== 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        if (shadowAdj !== 0 && L < 30) {
-          const shadowStrength = (30 - L) / 30;
-          L = L * (1 + shadowAdj * 0.15 * shadowStrength);
-        }
-        if (highlightAdj !== 0 && L > 70) {
-          const highlightStrength = (L - 70) / 30;
-          L = L * (1 + highlightAdj * 0.15 * highlightStrength);
-        }
-        L = Math.max(0, Math.min(100, L));
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      if (film === 'acros'){
-        const a = (r+g+bl)/3;
-        r=g=bl=a;
-      } else {
-        const a = (r+g+bl)/3;
-        r = r*.85 + a*.15;
-        g = g*.85 + a*.15;
-        bl = bl*.85 + a*.15;
-      }
-
-      if (useColorMix){
-        let [L, C, H] = rgbToLch(r, g, bl);
-        if (C > 5) {
-          const adj = getAdjustmentsForHue(H, cmState);
-          const chromaMultiplier = 1 + (adj.sat * 0.8);
-          C = Math.max(0, Math.min(130, C * chromaMultiplier));
-          L = Math.max(0, Math.min(100, L + adj.lum * 40));
-        }
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      if (colorChrome > 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        if (C > 40) {
-          const strength = colorChrome === 1 ? 0.3 : 0.6;
-          let colorBoost = 1.0;
-          if ((H >= 0 && H <= 60) || (H >= 330 && H <= 360)) colorBoost = 1.4;
-          else if (H >= 40 && H <= 80) colorBoost = 1.2;
-          else if (H >= 80 && H <= 160) colorBoost = 1.15;
-          const saturationFactor = Math.pow((C - 40) / 90, 0.6);
-          C = C + saturationFactor * strength * 35 * colorBoost;
-          L = L * (1 - saturationFactor * strength * 0.08);
-        }
-        C = Math.max(0, Math.min(130, C));
-        L = Math.max(0, Math.min(100, L));
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      if (colorChromeBlue > 0) {
-        let [L, C, H] = rgbToLch(r, g, bl);
-        if (H >= 200 && H <= 260 && C > 20) {
-          const strength = colorChromeBlue === 1 ? 0.4 : 0.7;
-          const blueStrength = 1 - Math.abs(H - 230) / 30;
-          C = C * (1 + strength * blueStrength * 0.5);
-          L = L * (1 - strength * blueStrength * 0.12);
-        }
-        C = Math.max(0, Math.min(130, C));
-        L = Math.max(0, Math.min(100, L));
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      if (useTricolor){
-        let [L, C, H] = rgbToLch(r, g, bl);
-        const lumNorm = L / 100;
-        let shadowWeight = 0, midtoneWeight = 0, highlightWeight = 0;
-        if (lumNorm < 0.5) {
-          shadowWeight = Math.exp(-8 * (lumNorm - 0.15) * (lumNorm - 0.15));
-          midtoneWeight = Math.exp(-8 * (lumNorm - 0.4) * (lumNorm - 0.4));
-        } else {
-          midtoneWeight = Math.exp(-8 * (lumNorm - 0.6) * (lumNorm - 0.6));
-          highlightWeight = Math.exp(-8 * (lumNorm - 0.85) * (lumNorm - 0.85));
-        }
-        const totalWeight = shadowWeight + midtoneWeight + highlightWeight;
-        if (totalWeight > 0) {
-          shadowWeight /= totalWeight;
-          midtoneWeight /= totalWeight;
-          highlightWeight /= totalWeight;
-        }
-        let hueShift = 0, chromaBoost = 0;
-        if (shadowWeight > 0.1 && tricolorState.shadow.strength > 0) {
-          const strength = (tricolorState.shadow.strength / 100) * shadowWeight;
-          const targetHue = tricolorState.shadow.hue;
-          let hueDelta = targetHue - H;
-          if (hueDelta > 180) hueDelta -= 360;
-          if (hueDelta < -180) hueDelta += 360;
-          hueShift += hueDelta * strength * 0.3;
-          chromaBoost += strength * 20;
-        }
-        if (midtoneWeight > 0.1 && tricolorState.midtone.strength > 0) {
-          const strength = (tricolorState.midtone.strength / 100) * midtoneWeight;
-          const targetHue = tricolorState.midtone.hue;
-          let hueDelta = targetHue - H;
-          if (hueDelta > 180) hueDelta -= 360;
-          if (hueDelta < -180) hueDelta += 360;
-          hueShift += hueDelta * strength * 0.3;
-          chromaBoost += strength * 20;
-        }
-        if (highlightWeight > 0.1 && tricolorState.highlight.strength > 0) {
-          const strength = (tricolorState.highlight.strength / 100) * highlightWeight;
-          const targetHue = tricolorState.highlight.hue;
-          let hueDelta = targetHue - H;
-          if (hueDelta > 180) hueDelta -= 360;
-          if (hueDelta < -180) hueDelta += 360;
-          hueShift += hueDelta * strength * 0.3;
-          chromaBoost += strength * 20;
-        }
-        H = (H + hueShift + 360) % 360;
-        C = Math.max(0, Math.min(130, C + chromaBoost));
-        [r, g, bl] = lchToRgb(L, C, H);
-      }
-
-      if (grainAmt > 0){
-        const normalizedGrain = grainAmt / 50;
-        const actualIntensity = Math.pow(normalizedGrain, 1.8) * 15;
-        const scaleMap = [0, 0.015, 0.008, 0.004];
-        const scale = scaleMap[grainSize] || 0.008;
-        const octaves = grainSize === 1 ? 3 : 2;
-        const rNoise = perlinNoise(x + 1000, y, scale, octaves) * actualIntensity;
-        const gNoise = perlinNoise(x + 2000, y, scale, octaves) * actualIntensity;
-        const bNoise = perlinNoise(x + 3000, y, scale, octaves) * actualIntensity;
-        const lum = (r + g + bl) / 3;
-        const lumFactor = 1 - Math.abs((lum / 255) - 0.5) * 0.5;
-        r += rNoise * lumFactor;
-        g += gNoise * lumFactor;
-        bl += bNoise * lumFactor;
-      }
-
-      if (vigPower > 0){
-        const dx = x - cx, dy = y - cy;
-        const distX = dx / radiusX, distY = dy / radiusY;
-        const ellipticalDist = Math.sqrt(distX * distX + distY * distY);
-        const fall = Math.min(1, Math.max(0, ellipticalDist));
-        const vignetteFactor = 1 - vigPower * Math.pow(fall, featherPower);
-        r *= vignetteFactor;
-        g *= vignetteFactor;
-        bl *= vignetteFactor;
-      }
-
-      d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
-      d[i+1] = g < 0 ? 0 : g > 255 ? 255 : g;
-      d[i+2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
-    }
-  }
-
-  if (useHalation) {
-    const { blur, strength, threshold } = halationState;
-    const brightPixels = new Uint8ClampedArray(d.length);
-    for (let i = 0; i < d.length; i += 4) {
-      const brightness = (d[i] + d[i+1] + d[i+2]) / 3;
-      if (brightness >= threshold) {
-        brightPixels[i] = 255;
-        brightPixels[i+1] = 255;
-        brightPixels[i+2] = 255;
-        brightPixels[i+3] = 255;
-      }
-    }
-    const blurRadius = Math.max(1, Math.round(blur));
-    const blurred = new Uint8ClampedArray(brightPixels.length);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, sumG = 0, sumB = 0, count = 0;
-        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
-          const nx = x + dx;
-          if (nx >= 0 && nx < W) {
-            const idx = (y * W + nx) * 4;
-            sumR += brightPixels[idx];
-            sumG += brightPixels[idx + 1];
-            sumB += brightPixels[idx + 2];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        blurred[idx] = sumR / count;
-        blurred[idx + 1] = sumG / count;
-        blurred[idx + 2] = sumB / count;
-      }
-    }
-    const blurred2 = new Uint8ClampedArray(blurred.length);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, sumG = 0, sumB = 0, count = 0;
-        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
-          const ny = y + dy;
-          if (ny >= 0 && ny < H) {
-            const idx = (ny * W + x) * 4;
-            sumR += blurred[idx];
-            sumG += blurred[idx + 1];
-            sumB += blurred[idx + 2];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        blurred2[idx] = sumR / count;
-        blurred2[idx + 1] = sumG / count;
-        blurred2[idx + 2] = sumB / count;
-      }
-    }
-    for (let i = 0; i < blurred2.length; i += 4) {
-      if (blurred2[i] > 0 || blurred2[i+1] > 0 || blurred2[i+2] > 0) {
-        const brightness = (blurred2[i] + blurred2[i+1] + blurred2[i+2]) / 3;
-        blurred2[i] = Math.min(255, brightness + strength);
-        blurred2[i+1] = 0;
-        blurred2[i+2] = 0;
-      }
-    }
-    const finalBlurred = new Uint8ClampedArray(blurred2.length);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, count = 0;
-        for (let dx = -blurRadius; dx <= blurRadius; dx++) {
-          const nx = x + dx;
-          if (nx >= 0 && nx < W) {
-            const idx = (y * W + nx) * 4;
-            sumR += blurred2[idx];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        finalBlurred[idx] = sumR / count;
-      }
-    }
-    const finalBlurred2 = new Uint8ClampedArray(finalBlurred.length);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        let sumR = 0, count = 0;
-        for (let dy = -blurRadius; dy <= blurRadius; dy++) {
-          const ny = y + dy;
-          if (ny >= 0 && ny < H) {
-            const idx = (ny * W + x) * 4;
-            sumR += finalBlurred[idx];
-            count++;
-          }
-        }
-        const idx = (y * W + x) * 4;
-        finalBlurred2[idx] = sumR / count;
-      }
-    }
-    for (let i = 0; i < d.length; i += 4) {
-      const halationR = finalBlurred2[i];
-      if (halationR > 0) {
-        const origR = d[i] / 255;
-        const origG = d[i+1] / 255;
-        const origB = d[i+2] / 255;
-        const halR = halationR / 255;
-        d[i] = Math.min(255, (1 - (1 - origR) * (1 - halR)) * 255);
-        d[i+1] = Math.min(255, (1 - (1 - origG) * (1 - halR)) * 255);
-        d[i+2] = Math.min(255, (1 - (1 - origB) * (1 - halR)) * 255);
-      }
-    }
-  }
-
-  self.postMessage({ imageData }, [imageData.data.buffer]);
-};
-`;
-const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], {type: 'application/javascript'})));
-
-/* ========== SHOOT ========== */
-shutter.addEventListener('click', () => {
-  userText = '';
-  shoot();
-});
-
-async function shoot() {
-  if (!video.videoWidth) {
-    alert('Wait for camera');
-    return;
-  }
-
-  document.getElementById('font-size-controls').style.display = 'none';
-  const w = video.videoWidth;
-  const h = video.videoHeight;
-  const b = Math.floor(Math.min(w, h) * 0.09);
-  const fw = w + b * 2;
-  const bot = b * 2;
-  const fh = h + b + bot;
-
-  canvas.width = fw;
-  canvas.height = fh;
-  dim = { fw, fh, b, bot };
-
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, fw, fh);
-  ctx.drawImage(video, b, b, w, h);
-
-  canvas.style.display = 'block';
-  video.style.display = 'none';
-  nextBtn.style.display = 'flex';
-  textBtn.style.display = 'flex';
-  saveBtn.style.display = 'flex';
-  
-  sheetExpanded = false;
-  bottomSheet.classList.remove('expanded');
-
-  const roi = ctx.getImageData(b, b, w, h);
-  processingEl.style.display = 'flex';
-
-  worker.postMessage({
-    imageData: roi,
-    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
-    grainAmt,
-    grainSize,
-    exposureComp,
-    highlightAdj,
-    shadowAdj,
-    colorChrome,
-    colorChromeBlue,
-    cmState,
-    colors,
-    hueWidth,
-    wb,
-    vignetteAmt,
-    vignetteSize,
-    vignetteFeather,
-    tricolorState,
-    halationState,
-    lutState,
-    lut3D,
-    lutSize
-  }, [roi.data.buffer]);
-
-  worker.onmessage = (e) => {
-    const { imageData } = e.data;
-    ctx.putImageData(imageData, b, b);
-    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
-    drawText(ctx);
-    processingEl.style.display = 'none';
-  };
-}
-
-function shootReprocess() {
-  if (!dim) return;
-  const { fw, fh, b, bot } = dim;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const roi = ctx.getImageData(b, b, canvas.width - b * 2, canvas.height - b * 2 - (bot - b));
-  
-  processingEl.style.display = 'flex';
-
-  worker.postMessage({
-    imageData: roi,
-    film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
-    grainAmt,
-    grainSize,
-    exposureComp,
-    highlightAdj,
-    shadowAdj,
-    colorChrome,
-    colorChromeBlue,
-    cmState,
-    colors,
-    hueWidth,
-    wb,
-    vignetteAmt,
-    vignetteSize,
-    vignetteFeather,
-    tricolorState,
-    halationState,
-    lutState,
-    lut3D,
-    lutSize
-  }, [roi.data.buffer]);
-
-  worker.onmessage = (e) => {
-    const { imageData } = e.data;
-    ctx.putImageData(imageData, b, b);
-    lastFrameImageData = ctx.getImageData(0, 0, fw, fh);
-    drawText(ctx);
-    processingEl.style.display = 'none';
-  };
-}
-
-/* ========== TEXT ========== */
-const textModal = document.getElementById('text-modal');
-const textInput = document.getElementById('text-input');
-
-textBtn.addEventListener('click', () => {
-  textModal.style.display = 'flex';
-  textInput.focus();
-});
-
-document.getElementById('text-cancel').addEventListener('click', () => {
-  textModal.style.display = 'none';
-  textInput.value = '';
-});
-
-document.getElementById('text-submit').addEventListener('click', async () => {
-  userText = textInput.value.trim();
-  if (userText) {
-    if (document.fonts) {
-      await document.fonts.load('131px "Mistrully"').catch(() => {});
-    }
-    updateText();
-    document.getElementById('font-size-controls').style.display = 'flex';
-  }
-  textModal.style.display = 'none';
-  textInput.value = '';
-});
-
-function updateText() {
-  if (!dim) return;
-  const ctx = canvas.getContext('2d');
-  if (lastFrameImageData) ctx.putImageData(lastFrameImageData, 0, 0);
-  drawText(ctx);
-}
-
-function drawText(ctx) {
-  if (!userText || !dim) return;
-  const { fw, fh, bot } = dim;
-  
-  if (document.fonts) {
-    document.fonts.load(`${currentFontSize}px "Mistrully"`).catch(() => {});
-  }
-  
-  ctx.font = `${currentFontSize}px "Mistrully", cursive`;
-  
-  let fs = currentFontSize;
-  while (ctx.measureText(userText).width > fw - 20 && fs > 16) {
-    fs--;
-    ctx.font = `${fs}px "Mistrully", cursive`;
-  }
-  
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(userText, fw / 2, fh - bot / 2);
-}
-
-/* ========== NEXT/RESET ========== */
-nextBtn.addEventListener('click', () => {
-  video.style.display = 'block';
-  canvas.style.display = 'none';
-  nextBtn.style.display = 'none';
-  textBtn.style.display = 'none';
-  saveBtn.style.display = 'none';
-  document.getElementById('font-size-controls').style.display = 'none';
-  lastFrameImageData = null;
-  dim = null;
-  userText = '';
-  currentFontSize = 131;
-});
-
-/* ========== SAVE ========== */
-saveBtn.addEventListener('click', () => {
-  if (!dim) {
-    alert('Take a photo first');
-    return;
-  }
-  
-  const { fw, fh } = dim;
-  const scale = 1810 / 4420;
-  const tmp = document.createElement('canvas');
-  
-  tmp.width = Math.floor(fw * scale);
-  tmp.height = Math.floor(fh * scale);
-  const tctx = tmp.getContext('2d');
-  tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
-  
-  tmp.toBlob(blob => {
-    if (!blob) {
-      alert('Save failed');
-      return;
-    }
-    
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `photo-${Date.now()}.jpg`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    
-    const fr = new FileReader();
-    fr.onloadend = () => localStorage.setItem(`saved-photo-${Date.now()}`, fr.result);
-    fr.readAsDataURL(blob);
-  }, 'image/jpeg', jpegQ / 100);
-});
-
-/* ========== GALLERY ========== */
-document.getElementById('gallery-btn').addEventListener('click', () => {
-  const content = document.getElementById('gallery-content');
-  content.innerHTML = '';
-  
-  const keys = Object.keys(localStorage)
-    .filter(k => k.startsWith('saved-photo-'))
-    .sort()
-    .reverse();
-  
-  if (!keys.length) {
-    content.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center; padding: 40px;">No saved images</p>';
-  } else {
-    keys.forEach(k => {
-      const img = document.createElement('img');
-      img.src = localStorage.getItem(k);
-      content.appendChild(img);
-    });
-  }
-  
-  document.getElementById('gallery-overlay').style.display = 'flex';
-});
-
-document.getElementById('gallery-close').addEventListener('click', () => {
-  document.getElementById('gallery-overlay').style.display = 'none';
-});
-
-document.getElementById('increase-font').addEventListener('click', () => {
-  if (userText && currentFontSize < 200) {
-    currentFontSize += 5;
-    updateText();
-  }
-});
-
-document.getElementById('decrease-font').addEventListener('click', () => {
-  if (userText && currentFontSize > 20) {
-    currentFontSize -= 5;
-    updateText();
-  }
-});
-  
 /* ========== INIT ========== */
 loadProfiles();
 
-// Apply Filmic A preset values directly on startup
-film = 'kodachrome';
-shadowAdj = 1.4;
-wb = { r: -2, g: 2, b: 3 };
-halationState = { enable: true, blur: 17, strength: 27, threshold: 221 };
+// Initialize LUT
+lutSize = EMBEDDED_LUT_SIZE;
+lut3D = EMBEDDED_LUT_DATA;
 
-// Update UI to match Filmic A defaults
-shadowSlider.value = shadowAdj;
-shadowVal.textContent = '+' + shadowAdj.toFixed(1);
-wbRSlider.value = wb.r; wbRVal.textContent = wb.r;
-wbGSlider.value = wb.g; wbGVal.textContent = wb.g;
-wbBSlider.value = wb.b; wbBVal.textContent = wb.b;
-updateHalationUI();
-updateLUTUI();
-
-loadLUT();
+// All settings start neutral (no Filmic A defaults)
 bootCam();
 
 document.addEventListener('contextmenu', e => {
   if (e.target.id !== 'photo') e.preventDefault();
 }, { passive: false });
+
+/* ========== LOAD SAVED LUT STATE ========== */
+try {
+  const savedLutEnabled = localStorage.getItem('lutEnabledV1');
+  if (savedLutEnabled !== null) {
+    lutEnabled = savedLutEnabled === 'true';
+    document.getElementById('lut-enable').checked = lutEnabled;
+  }
+} catch {}
 </script>
 
 </body>
