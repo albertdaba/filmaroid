@@ -2164,8 +2164,8 @@ async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
 const c = { 
     video: id 
-      ? { deviceId: {exact: id}, width: { min: 640, ideal: 9999 }, height: { min: 480, ideal: 9999 } }
-      : { facingMode: {ideal: 'environment'}, width: { min: 640, ideal: 9999 }, height: { min: 480, ideal: 9999 } }
+      ? { deviceId: {exact: id}, width: { max: 1920 }, height: { max: 1920 } }
+      : { facingMode: {ideal: 'environment'}, width: { max: 1920 }, height: { max: 1920 } }
   };
   
   try {
