@@ -807,17 +807,57 @@ select {
       <div class="control-group">
         <div class="control-label">
           <span>Film Grain Amount</span>
-          <span class="control-value" id="grain-val">19</span>
+          <span class="control-value" id="grain-amount-val">0.22</span>
         </div>
-        <input type="range" id="grain" min="0" max="50" value="19">
+        <input type="range" id="grain-amount" min="0" max="1" step="0.01" value="0.22">
       </div>
-      
+
       <div class="control-group">
         <div class="control-label">
-          <span>Film Grain Size</span>
-          <span class="control-value" id="grain-size-val">Medium</span>
+          <span>Grain Size</span>
+          <span class="control-value" id="grain-size-val">1.5</span>
         </div>
-        <input type="range" id="grain-size" min="1" max="3" step="1" value="2">
+        <input type="range" id="grain-size" min="0.5" max="6" step="0.1" value="1.5">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Grain Softness</span>
+          <span class="control-value" id="grain-soft-val">0.40</span>
+        </div>
+        <input type="range" id="grain-soft" min="0" max="1" step="0.01" value="0.40">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Midtone Peak</span>
+          <span class="control-value" id="grain-peak-val">0.48</span>
+        </div>
+        <input type="range" id="grain-peak" min="0.2" max="0.8" step="0.01" value="0.48">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Shadow Protection</span>
+          <span class="control-value" id="grain-shadow-val">0.30</span>
+        </div>
+        <input type="range" id="grain-shadow" min="0" max="1" step="0.01" value="0.30">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Highlight Protection</span>
+          <span class="control-value" id="grain-highlight-val">0.25</span>
+        </div>
+        <input type="range" id="grain-highlight" min="0" max="1" step="0.01" value="0.25">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Grain Seed</span>
+          <span class="control-value" id="grain-seed-val">0.5000</span>
+        </div>
+        <button id="grain-reseed-btn" style="width:100%;padding:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;font-size:13px;cursor:pointer;">↻ New Random Seed</button>
       </div>
       
       <div class="divider"></div>
@@ -1112,8 +1152,15 @@ const sheetHandle = document.getElementById('sheet-handle');
 
 /* ========== STATE ========== */
 let stream = null;
-let grainAmt = 19;
-let grainSize = 2;
+let grainState = {
+  amount: 0.22,
+  size: 1.5,
+  soft: 0.40,
+  peak: 0.48,
+  shadow: 0.30,
+  highlight: 0.25,
+  seed: Math.random()
+};
 let film = 'none';
 let jpegQ = 60;
 let userText = '';
@@ -1275,7 +1322,8 @@ document.querySelectorAll('.preset-card').forEach(card => {
     if (preset === 'filmic-a') {
       // Apply Filmic A full settings
       film = 'kodachrome';
-      grainAmt = 0; grainSize = 2; exposureComp = 0; highlightAdj = 0;
+      grainState = { amount: 0, size: 1.5, soft: 0.40, peak: 0.48, shadow: 0.30, highlight: 0.25, seed: Math.random() };
+      exposureComp = 0; highlightAdj = 0;
       shadowAdj = 1.4;
       colorChrome = 0; colorChromeBlue = 0;
       wb = { r: -2, g: 2, b: 3 };
@@ -1285,10 +1333,7 @@ document.querySelectorAll('.preset-card').forEach(card => {
       halationState = { enable: true, blur: 17, strength: 27, threshold: 221 };
       
       // Update UI
-      document.getElementById('grain').value = grainAmt;
-      document.getElementById('grain-val').textContent = grainAmt;
-      document.getElementById('grain-size').value = grainSize;
-      document.getElementById('grain-size-val').textContent = 'Medium';
+      syncGrainUI();
       document.getElementById('exposure').value = exposureComp;
       document.getElementById('exposure-val').textContent = '0.0';
       document.getElementById('highlight').value = highlightAdj;
@@ -1317,7 +1362,8 @@ document.querySelectorAll('.preset-card').forEach(card => {
     } else {
       // Simple preset - just change film base and reset to defaults
       film = preset;
-      grainAmt = 0; grainSize = 2; exposureComp = 0; highlightAdj = 0; shadowAdj = 0;
+      grainState = { amount: 0, size: 1.5, soft: 0.40, peak: 0.48, shadow: 0.30, highlight: 0.25, seed: Math.random() };
+      exposureComp = 0; highlightAdj = 0; shadowAdj = 0;
       colorChrome = 0; colorChromeBlue = 0;
       wb = { r: 0, g: 0, b: 0 };
       vignetteAmt = 0; vignetteSize = 0.7; vignetteFeather = 2.0;
@@ -1326,10 +1372,7 @@ document.querySelectorAll('.preset-card').forEach(card => {
       halationState = { enable: false, blur: 10, strength: 50, threshold: 200 };
       
       // Update UI
-      document.getElementById('grain').value = grainAmt;
-      document.getElementById('grain-val').textContent = grainAmt;
-      document.getElementById('grain-size').value = grainSize;
-      document.getElementById('grain-size-val').textContent = 'Medium';
+      syncGrainUI();
       document.getElementById('exposure').value = exposureComp;
       document.getElementById('exposure-val').textContent = '0.0';
       document.getElementById('highlight').value = highlightAdj;
@@ -1387,22 +1430,82 @@ shadowSlider.addEventListener('input', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
-const grainSlider = document.getElementById('grain');
-const grainVal = document.getElementById('grain-val');
-grainSlider.addEventListener('input', () => {
-  grainAmt = +grainSlider.value;
-  grainVal.textContent = grainAmt;
+/* ========== GRAIN SLIDERS ========== */
+const grainAmountSlider   = document.getElementById('grain-amount');
+const grainAmountVal      = document.getElementById('grain-amount-val');
+const grainSizeSlider     = document.getElementById('grain-size');
+const grainSizeVal        = document.getElementById('grain-size-val');
+const grainSoftSlider     = document.getElementById('grain-soft');
+const grainSoftVal        = document.getElementById('grain-soft-val');
+const grainPeakSlider     = document.getElementById('grain-peak');
+const grainPeakVal        = document.getElementById('grain-peak-val');
+const grainShadowSlider   = document.getElementById('grain-shadow');
+const grainShadowVal      = document.getElementById('grain-shadow-val');
+const grainHighlightSlider = document.getElementById('grain-highlight');
+const grainHighlightVal   = document.getElementById('grain-highlight-val');
+const grainSeedVal        = document.getElementById('grain-seed-val');
+const grainReseedBtn      = document.getElementById('grain-reseed-btn');
+
+function syncGrainUI() {
+  grainAmountSlider.value   = grainState.amount;
+  grainAmountVal.textContent = grainState.amount.toFixed(2);
+  grainSizeSlider.value     = grainState.size;
+  grainSizeVal.textContent  = grainState.size.toFixed(1);
+  grainSoftSlider.value     = grainState.soft;
+  grainSoftVal.textContent  = grainState.soft.toFixed(2);
+  grainPeakSlider.value     = grainState.peak;
+  grainPeakVal.textContent  = grainState.peak.toFixed(2);
+  grainShadowSlider.value   = grainState.shadow;
+  grainShadowVal.textContent = grainState.shadow.toFixed(2);
+  grainHighlightSlider.value   = grainState.highlight;
+  grainHighlightVal.textContent = grainState.highlight.toFixed(2);
+  grainSeedVal.textContent  = grainState.seed.toFixed(4);
+}
+
+grainAmountSlider.addEventListener('input', () => {
+  grainState.amount = parseFloat(grainAmountSlider.value);
+  grainAmountVal.textContent = grainState.amount.toFixed(2);
   if (lastFrameImageData) shootReprocess();
 });
 
-const grainSizeSlider = document.getElementById('grain-size');
-const grainSizeVal = document.getElementById('grain-size-val');
 grainSizeSlider.addEventListener('input', () => {
-  grainSize = +grainSizeSlider.value;
-  const labels = ['', 'Small', 'Medium', 'Large'];
-  grainSizeVal.textContent = labels[grainSize];
+  grainState.size = parseFloat(grainSizeSlider.value);
+  grainSizeVal.textContent = grainState.size.toFixed(1);
   if (lastFrameImageData) shootReprocess();
 });
+
+grainSoftSlider.addEventListener('input', () => {
+  grainState.soft = parseFloat(grainSoftSlider.value);
+  grainSoftVal.textContent = grainState.soft.toFixed(2);
+  if (lastFrameImageData) shootReprocess();
+});
+
+grainPeakSlider.addEventListener('input', () => {
+  grainState.peak = parseFloat(grainPeakSlider.value);
+  grainPeakVal.textContent = grainState.peak.toFixed(2);
+  if (lastFrameImageData) shootReprocess();
+});
+
+grainShadowSlider.addEventListener('input', () => {
+  grainState.shadow = parseFloat(grainShadowSlider.value);
+  grainShadowVal.textContent = grainState.shadow.toFixed(2);
+  if (lastFrameImageData) shootReprocess();
+});
+
+grainHighlightSlider.addEventListener('input', () => {
+  grainState.highlight = parseFloat(grainHighlightSlider.value);
+  grainHighlightVal.textContent = grainState.highlight.toFixed(2);
+  if (lastFrameImageData) shootReprocess();
+});
+
+grainReseedBtn.addEventListener('click', () => {
+  grainState.seed = Math.random();
+  grainSeedVal.textContent = grainState.seed.toFixed(4);
+  if (lastFrameImageData) shootReprocess();
+});
+
+// Init display
+syncGrainUI();
 
 const colorChromeSelect = document.getElementById('color-chrome');
 colorChromeSelect.addEventListener('change', () => {
@@ -1858,20 +1961,18 @@ function applyProfile(name) {
   if (!p) return;
   
   film = p.filmBase || 'none';
-  grainAmt = p.grainAmt || 0;
-  grainSize = p.grainSize || 2;
+  grainState = p.grainState ? { ...p.grainState, seed: Math.random() } : { amount: 0, size: 1.5, soft: 0.40, peak: 0.48, shadow: 0.30, highlight: 0.25, seed: Math.random() };
+  // Legacy support: if profile has old grainAmt field, convert it
+  if (!p.grainState && typeof p.grainAmt === 'number') {
+    grainState.amount = p.grainAmt / 50;
+  }
   exposureComp = p.exposureComp || 0;
   highlightAdj = p.highlightAdj || 0;
   shadowAdj = p.shadowAdj || 0;
   colorChrome = p.colorChrome || 0;
   colorChromeBlue = p.colorChromeBlue || 0;
-  
-  grainSlider.value = grainAmt;
-  grainVal.textContent = grainAmt;
-  grainSizeSlider.value = grainSize;
-  const labels = ['', 'Small', 'Medium', 'Large'];
-  grainSizeVal.textContent = labels[grainSize];
-  
+
+  syncGrainUI();
   exposureSlider.value = exposureComp;
   exposureVal.textContent = exposureComp > 0 ? '+' + exposureComp.toFixed(1) : exposureComp.toFixed(1);
   
@@ -2034,8 +2135,7 @@ document.getElementById('save-profile-btn').addEventListener('click', () => {
   
   profiles[name] = {
     filmBase: film,
-    grainAmt,
-    grainSize,
+    grainState: { ...grainState },
     exposureComp,
     highlightAdj,
     shadowAdj,
@@ -2207,7 +2307,7 @@ function apply3DLUT(imageData) {
 /* ========== WORKER ========== */
 const workerSrc = `
 self.onmessage = (e) => {
-  const { imageData, film, grainAmt, grainSize, exposureComp, highlightAdj, shadowAdj, colorChrome, colorChromeBlue, cmState, colors, hueWidth, wb, vignetteAmt, vignetteSize, vignetteFeather, tricolorState, halationState } = e.data;
+  const { imageData, film, grain, exposureComp, highlightAdj, shadowAdj, colorChrome, colorChromeBlue, cmState, colors, hueWidth, wb, vignetteAmt, vignetteSize, vignetteFeather, tricolorState, halationState } = e.data;
   const d = imageData.data;
   const useColorMix = cmState.enable && film !== 'acros';
   const useTricolor = tricolorState.enable && film !== 'acros';
@@ -2333,10 +2433,71 @@ self.onmessage = (e) => {
     return { sat: 0, lum: 0 };
   }
 
-function filmGrain(x, y, seed) {
-    let n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.3) * 43758.5453;
-    n = n - Math.floor(n);
-    return n * 2.0 - 1.0;
+  // ── Hash Without Sine (Dave Hoskins method, JS port) ─────────────
+  // Returns pseudo-random float [0,1] for cell coords (px, py).
+  // No sin/cos → no periodicity artifacts → no banding.
+  function hash21(px, py) {
+    let x = px * 0.1031;
+    let y = py * 0.1031;
+    let z = px * 0.1031;
+    // fract(vec3 * 0.1031)
+    x = x - Math.floor(x);
+    y = y - Math.floor(y);
+    z = z - Math.floor(z);
+    // p3 += dot(p3, p3.yzx + 33.33)
+    const dot = x * (y + 33.33) + y * (z + 33.33) + z * (x + 33.33);
+    x += dot; y += dot; z += dot;
+    // fract((p3.x + p3.y) * p3.z)
+    const val = (x + y) * z;
+    return val - Math.floor(val);
+  }
+
+  // ── Grain sample with optional intra-cell softness ────────────────
+  function grainSample(uvx, uvy, resW, resH, gSize, gSoft, gSeed) {
+    const gridX = uvx * resW / gSize;
+    const gridY = uvy * resH / gSize;
+    const cellX = Math.floor(gridX);
+    const cellY = Math.floor(gridY);
+    const frX   = gridX - cellX;
+    const frY   = gridY - cellY;
+    const sv    = gSeed * 7.319;
+
+    const c00 = hash21(cellX       + sv, cellY       + sv);
+    const c10 = hash21(cellX + 1.0 + sv, cellY       + sv);
+    const c01 = hash21(cellX       + sv, cellY + 1.0 + sv);
+    const c11 = hash21(cellX + 1.0 + sv, cellY + 1.0 + sv);
+
+    // smoothstep blend clamped by softness
+    const safesoft = Math.max(gSoft, 0.001);
+    let bx = frX / safesoft;
+    let by = frY / safesoft;
+    // smoothstep(0,1,t) = t*t*(3-2*t)
+    bx = Math.max(0, Math.min(1, bx));
+    by = Math.max(0, Math.min(1, by));
+    bx = bx * bx * (3 - 2 * bx);
+    by = by * by * (3 - 2 * by);
+
+    const soft = (c00 * (1 - bx) + c10 * bx) * (1 - by) + (c01 * (1 - bx) + c11 * bx) * by;
+    const hard = c00;
+    return hard * (1 - gSoft) + soft * gSoft;
+  }
+
+  // ── Luminance (Rec.709) ───────────────────────────────────────────
+  function lumaRec709(r, g, b) {
+    return 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+  }
+
+  // ── Tonal bell curve ──────────────────────────────────────────────
+  function tonalMask(lum, peak, shadowP, hiP) {
+    const d = lum - peak;
+    const slope = d < 0
+      ? 1.0 + (4.0 - 1.0) * shadowP   // shadow slope
+      : 1.0 + (4.0 - 1.0) * hiP;      // highlight slope
+    const bell = Math.exp(-slope * 8.0 * d * d);
+    // smoothstep guards near pure black/white
+    const shadowGuard    = lum < 0.12 ? lum / 0.12 : 1.0;
+    const highlightGuard = lum > 0.88 ? (1.0 - lum) / 0.12 : 1.0;
+    return bell * shadowGuard * highlightGuard;
   }
 
   const W = imageData.width, H = imageData.height;
@@ -2488,18 +2649,17 @@ function filmGrain(x, y, seed) {
         [r, g, bl] = lchToRgb(L, C, H);
       }
 
-if (grainAmt > 0){
-  const normalizedGrain = grainAmt / 50;
-  const actualIntensity = Math.pow(normalizedGrain, 1.8) * 18;
-  const sizeMultiplier = grainSize === 1 ? 0.6 : grainSize === 2 ? 1.0 : 1.5;
-  const n = (Math.sin(x * 127.1 + y * 311.7) * 43758.5453 % 1 + 1) % 1 * 2 - 1;
-  const lum = (r + g + bl) / 3;
-  const lumNorm = lum / 255;
-  const lumFactor = 0.8 + (1.0 - lumNorm) * 0.6;
-  const grainVal = n * actualIntensity * lumFactor * sizeMultiplier;
-  r += grainVal;
-  g += grainVal;
-  bl += grainVal;
+if (grain.amount > 0){
+  const uvx = x / W;
+  const uvy = y / H;
+  const lum = lumaRec709(r, g, bl);
+  const mask = tonalMask(lum, grain.peak, grain.shadow, grain.highlight);
+  const g_val = grainSample(uvx, uvy, W, H, grain.size, grain.soft, grain.seed);
+  // Map [0,1] → [-0.5,0.5], scale by amount and tonal mask, convert to 0–255 range
+  const dev = (g_val - 0.5) * grain.amount * mask * 255;
+  r  += dev;
+  g  += dev;
+  bl += dev;
 }
       
       if (vigPower > 0){
@@ -2676,8 +2836,7 @@ async function shoot() {
   worker.postMessage({
     imageData: roi,
     film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
-    grainAmt,
-    grainSize,
+    grain: grainState,
     exposureComp,
     highlightAdj,
     shadowAdj,
@@ -2717,8 +2876,7 @@ function shootReprocess() {
   worker.postMessage({
     imageData: roi,
     film: activeProfileName && profiles[activeProfileName] ? profiles[activeProfileName].filmBase : film,
-    grainAmt,
-    grainSize,
+    grain: grainState,
     exposureComp,
     highlightAdj,
     shadowAdj,
