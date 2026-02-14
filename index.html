@@ -2806,14 +2806,38 @@ async function shoot() {
   document.getElementById('font-size-controls').style.display = 'none';
 
   // Try ImageCapture for full resolution, fall back to video frame
+ // Switch to full-res stream, capture, then switch back to low-res
   let imageBitmap = null;
   try {
-    const track = stream.getVideoTracks()[0];
+    const currentTrack = stream.getVideoTracks()[0];
+    const deviceId = currentTrack.getSettings().deviceId;
+
+    // Stop low-res stream
+    stream.getTracks().forEach(t => t.stop());
+
+    // Start full-res stream
+    const hiResStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId } }
+    });
+
+    // Capture from full-res
+    const track = hiResStream.getVideoTracks()[0];
     const imageCapture = new ImageCapture(track);
     const blob = await imageCapture.takePhoto();
     imageBitmap = await createImageBitmap(blob);
+
+    // Stop full-res stream
+    hiResStream.getTracks().forEach(t => t.stop());
+
+    // Restart low-res viewfinder stream
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId }, width: { max: 640 }, height: { max: 480 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+
   } catch (err) {
-    console.warn('ImageCapture failed, falling back to video frame:', err);
+    console.warn('Full-res capture failed, falling back to video frame:', err);
   }
 
   let w, h;
