@@ -2162,14 +2162,26 @@ document.getElementById('import-preset-btn').addEventListener('click', () => {
 /* ========== CAMERA ========== */
 async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
+ async function bootCam(id = null) {
+  if (stream) stream.getTracks().forEach(t => t.stop());
   const c = { 
     video: id 
-      ? { deviceId: {exact: id} }
-      : { facingMode: {ideal: 'environment'} }
+      ? { deviceId: {exact: id}, width: { min: 1920 }, height: { min: 1440 } }
+      : { facingMode: {ideal: 'environment'}, width: { min: 1920 }, height: { min: 1440 } }
   };
   
   try {
     stream = await navigator.mediaDevices.getUserMedia(c);
+    video.srcObject = stream;
+    await video.play();
+    // Log what we actually got
+    const s = stream.getVideoTracks()[0].getSettings();
+    console.log('Stream resolution:', s.width, 'x', s.height);
+    await updateCameraList();
+  } catch (e) {
+    alert('Camera error: ' + e.message);
+  }
+}
     video.srcObject = stream;
     await video.play();
     await updateCameraList();
