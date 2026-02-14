@@ -2826,18 +2826,24 @@ async function shoot() {
     const blob = await imageCapture.takePhoto();
     imageBitmap = await createImageBitmap(blob);
 
-    // Stop full-res stream
+   // Stop full-res stream
     hiResStream.getTracks().forEach(t => t.stop());
 
-    // Restart low-res viewfinder stream
-    stream = await navigator.mediaDevices.getUserMedia({
+    // Restart low-res viewfinder in background — don't await, don't block capture
+    navigator.mediaDevices.getUserMedia({
       video: { deviceId: { exact: deviceId }, width: { max: 640 }, height: { max: 480 } }
-    });
-    video.srcObject = stream;
-    await video.play();
+    }).then(lowResStream => {
+      stream = lowResStream;
+      video.srcObject = lowResStream;
+      video.play().catch(() => {});
+    }).catch(() => {});
 
   } catch (err) {
     console.warn('Full-res capture failed, falling back to video frame:', err);
+    // If capture failed entirely, make sure stream is still alive
+    if (!stream || !stream.active) {
+      bootCam();
+    }
   }
 
   let w, h;
