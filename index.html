@@ -2162,10 +2162,10 @@ document.getElementById('import-preset-btn').addEventListener('click', () => {
 /* ========== CAMERA ========== */
 async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
-const c = { 
+  const c = { 
     video: id 
-      ? { deviceId: {exact: id} }
-      : { facingMode: {ideal: 'environment'} }
+      ? { deviceId: {exact: id}, width: { ideal: 640 }, height: { ideal: 480 } }
+      : { facingMode: {ideal: 'environment'}, width: { ideal: 640 }, height: { ideal: 480 } }
   };
   
   try {
@@ -2805,45 +2805,15 @@ async function shoot() {
 
   document.getElementById('font-size-controls').style.display = 'none';
 
-  // Try ImageCapture for full resolution, fall back to video frame
- // Switch to full-res stream, capture, then switch back to low-res
+  // Capture full-res photo via ImageCapture on existing track
   let imageBitmap = null;
   try {
-    const currentTrack = stream.getVideoTracks()[0];
-    const deviceId = currentTrack.getSettings().deviceId;
-
-    // Stop low-res stream
-    stream.getTracks().forEach(t => t.stop());
-
-    // Start full-res stream
-    const hiResStream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: deviceId } }
-    });
-
-    // Capture from full-res
-    const track = hiResStream.getVideoTracks()[0];
+    const track = stream.getVideoTracks()[0];
     const imageCapture = new ImageCapture(track);
     const blob = await imageCapture.takePhoto();
     imageBitmap = await createImageBitmap(blob);
-
-   // Stop full-res stream
-    hiResStream.getTracks().forEach(t => t.stop());
-
-    // Restart low-res viewfinder in background — don't await, don't block capture
-    navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: deviceId }, width: { max: 640 }, height: { max: 480 } }
-    }).then(lowResStream => {
-      stream = lowResStream;
-      video.srcObject = lowResStream;
-      video.play().catch(() => {});
-    }).catch(() => {});
-
   } catch (err) {
-    console.warn('Full-res capture failed, falling back to video frame:', err);
-    // If capture failed entirely, make sure stream is still alive
-    if (!stream || !stream.active) {
-      bootCam();
-    }
+    console.warn('ImageCapture failed, falling back to video frame:', err);
   }
 
   let w, h;
