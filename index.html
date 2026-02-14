@@ -766,7 +766,12 @@ select {
   </div>
 </div>
       
-      <div class="divider"></div>
+     <div class="divider"></div>
+
+<div class="toggle-section">
+  <input type="checkbox" id="res-indicator-enable">
+  <label for="res-indicator-enable">Show Resolution Indicator</label>
+</div>
       
       <div id="custom-profiles"></div>
       
@@ -1215,7 +1220,9 @@ let halationState = {
   strength: 27,
   threshold: 230
 };
-
+  
+const RES_INDICATOR_KEY = 'resIndicatorV1';
+let resIndicatorEnabled = false;
 /* ========== LUT STATE ========== */
 let lut3D = null;
 let lutSize = 0;
@@ -1255,6 +1262,13 @@ try {
 try {
   const savedHalation = JSON.parse(localStorage.getItem(HALATION_KEY));
   if (savedHalation) halationState = savedHalation;
+} catch {}
+
+  try {
+  const savedResIndicator = localStorage.getItem(RES_INDICATOR_KEY);
+  if (savedResIndicator !== null) {
+    resIndicatorEnabled = savedResIndicator === 'true';
+  }
 } catch {}
 
 /* ========== TABS ========== */
@@ -1648,6 +1662,20 @@ halationThreshold.addEventListener('input', () => {
   if (lastFrameImageData) shootReprocess();
 });
 
+/* ========== RESOLUTION INDICATOR TOGGLE ========== */
+const resIndicatorCheckbox = document.getElementById('res-indicator-enable');
+resIndicatorCheckbox.checked = resIndicatorEnabled;
+
+resIndicatorCheckbox.addEventListener('change', () => {
+  resIndicatorEnabled = resIndicatorCheckbox.checked;
+  localStorage.setItem(RES_INDICATOR_KEY, String(resIndicatorEnabled));
+  
+  const dbg = document.getElementById('__dbg');
+  if (dbg) {
+    dbg.style.display = resIndicatorEnabled ? 'block' : 'none';
+  }
+});
+  
 /* ========== COLOR MIX ========== */
 const cmEnable = document.getElementById('cm-enable');
 const cmWrapper = document.getElementById('cm-wrapper');
@@ -2176,17 +2204,24 @@ async function bootCam(id = null) {
       video.srcObject = stream;
       await video.play();
       const s = stream.getVideoTracks()[0].getSettings();
-      
-      // Show resolution on screen — remove later
-      let dbg = document.getElementById('__dbg');
-      if (!dbg) {
-        dbg = document.createElement('div');
-        dbg.__dbg = true;
-        dbg.id = '__dbg';
-        dbg.style.cssText = 'position:fixed;top:70px;left:10px;background:red;color:#fff;padding:8px 12px;border-radius:8px;font-size:16px;font-weight:bold;z-index:9999;pointer-events:none;';
-        document.body.appendChild(dbg);
-      }
-      dbg.textContent = `Stream: ${s.width}×${s.height} | video: ${video.videoWidth}×${video.videoHeight}`;
+
+// Show resolution on screen only if enabled
+if (resIndicatorEnabled) {
+  let dbg = document.getElementById('__dbg');
+  if (!dbg) {
+    dbg = document.createElement('div');
+    dbg.id = '__dbg';
+    dbg.style.cssText = 'position:fixed;top:70px;left:10px;background:red;color:#fff;padding:8px 12px;border-radius:8px;font-size:16px;font-weight:bold;z-index:9999;pointer-events:none;';
+    document.body.appendChild(dbg);
+  }
+  dbg.textContent = `Stream: ${s.width}×${s.height} | video: ${video.videoWidth}×${video.videoHeight}`;
+  dbg.style.display = 'block';
+} else {
+  const dbg = document.getElementById('__dbg');
+  if (dbg) {
+    dbg.style.display = 'none';
+  }
+}
       
       await updateCameraList();
       return;
