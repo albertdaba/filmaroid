@@ -3071,13 +3071,14 @@ nextBtn.addEventListener('click', () => {
 });
 
 /* ========== SAVE ========== */
-saveBtn.addEventListener('click', () => {
+/* ========== SAVE ========== */
+saveBtn.addEventListener('click', async () => {
   if (!dim) {
     alert('Take a photo first');
     return;
   }
   
- const { fw, fh } = dim;
+  const { fw, fh } = dim;
   const tmp = document.createElement('canvas');
   
   tmp.width = fw;
@@ -3085,12 +3086,34 @@ saveBtn.addEventListener('click', () => {
   const tctx = tmp.getContext('2d');
   tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
   
-  tmp.toBlob(blob => {
+  tmp.toBlob(async (blob) => {
     if (!blob) {
       alert('Save failed');
       return;
     }
     
+    // Try Web Share API first (fastest on iOS)
+    if (navigator.share && navigator.canShare) {
+      try {
+        const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Film Photo'
+          });
+          return; // Success - user can save to Photos from share sheet
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.warn('Share failed, falling back to download:', err);
+        } else {
+          return; // User cancelled share
+        }
+      }
+    }
+    
+    // Fallback: traditional download
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `photo-${Date.now()}.jpg`;
