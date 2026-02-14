@@ -2162,10 +2162,10 @@ document.getElementById('import-preset-btn').addEventListener('click', () => {
 /* ========== CAMERA ========== */
 async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
-  const c = { 
+const c = { 
     video: id 
-      ? { deviceId: {exact: id}, width: {ideal: 1920}, height: {ideal: 1080} }
-      : { facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080} }
+      ? { deviceId: {exact: id}, width: { min: 640, ideal: 9999 }, height: { min: 480, ideal: 9999 } }
+      : { facingMode: {ideal: 'environment'}, width: { min: 640, ideal: 9999 }, height: { min: 480, ideal: 9999 } }
   };
   
   try {
