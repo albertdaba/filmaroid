@@ -2159,28 +2159,43 @@ document.getElementById('import-preset-btn').addEventListener('click', () => {
   importPreset();
 });
 
-/* ========== CAMERA ========== */
 async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
- async function bootCam(id = null) {
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  const c = { 
-    video: id 
-      ? { deviceId: {exact: id}, width: { min: 1920 }, height: { min: 1440 } }
-      : { facingMode: {ideal: 'environment'}, width: { min: 1920 }, height: { min: 1440 } }
-  };
   
-  try {
-    stream = await navigator.mediaDevices.getUserMedia(c);
-    video.srcObject = stream;
-    await video.play();
-    // Log what we actually got
-    const s = stream.getVideoTracks()[0].getSettings();
-    console.log('Stream resolution:', s.width, 'x', s.height);
-    await updateCameraList();
-  } catch (e) {
-    alert('Camera error: ' + e.message);
+  const attempts = [
+    id 
+      ? { deviceId: {exact: id}, width: {ideal: 4096}, height: {ideal: 3072} }
+      : { facingMode: {ideal: 'environment'}, width: {ideal: 4096}, height: {ideal: 3072} },
+    id
+      ? { deviceId: {exact: id} }
+      : { facingMode: {ideal: 'environment'} }
+  ];
+  for (const videoConstraints of attempts) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+      video.srcObject = stream;
+      await video.play();
+      const s = stream.getVideoTracks()[0].getSettings();
+      
+      // Show resolution on screen — remove later
+      let dbg = document.getElementById('__dbg');
+      if (!dbg) {
+        dbg = document.createElement('div');
+        dbg.__dbg = true;
+        dbg.id = '__dbg';
+        dbg.style.cssText = 'position:fixed;top:70px;left:10px;background:red;color:#fff;padding:8px 12px;border-radius:8px;font-size:16px;font-weight:bold;z-index:9999;pointer-events:none;';
+        document.body.appendChild(dbg);
+      }
+      dbg.textContent = `Stream: ${s.width}×${s.height} | video: ${video.videoWidth}×${video.videoHeight}`;
+      
+      await updateCameraList();
+      return;
+    } catch (e) {
+      console.warn('Camera attempt failed:', e.message);
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    }
   }
+  alert('Camera failed to start');
 }
     video.srcObject = stream;
     await video.play();
