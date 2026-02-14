@@ -2809,6 +2809,12 @@ async function shoot() {
   // Stream-swap: stop low-res, open full-res, capture, restart low-res
   let imageBitmap = null;
   try {
+    if (!stream || !stream.active) {
+      processingEl.style.display = 'none';
+      alert('Camera not ready');
+      return;
+    }
+
     const deviceId = stream.getVideoTracks()[0].getSettings().deviceId;
 
     // Stop low-res viewfinder
@@ -2818,7 +2824,6 @@ async function shoot() {
     // Open unconstrained full-res stream
     const hiResStream = await navigator.mediaDevices.getUserMedia({
       video: { deviceId: { exact: deviceId } }
-
     });
 
     // Give the stream a moment to initialize at full res
@@ -2843,9 +2848,10 @@ async function shoot() {
     }).catch(() => {});
 
   } catch (err) {
-    console.warn('Full-res capture failed, falling back to video frame:', err);
-    // If stream died, restart it
+    alert('Capture error: ' + err.message);
+    processingEl.style.display = 'none';
     if (!stream || !stream.active) bootCam();
+    return;
   }
 
   let w, h;
