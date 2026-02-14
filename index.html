@@ -2804,16 +2804,48 @@ async function shoot() {
   }
 
   document.getElementById('font-size-controls').style.display = 'none';
+  processingEl.style.display = 'flex';
 
-  // Capture full-res photo via ImageCapture on existing track
+  // Stream-swap: stop low-res, open full-res, capture, restart low-res
   let imageBitmap = null;
   try {
-    const track = stream.getVideoTracks()[0];
+    const deviceId = stream.getVideoTracks()[0].getSettings().deviceId;
+
+    // Stop low-res viewfinder
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+
+    // Open unconstrained full-res stream
+    const hiResStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId } }
+
+    });
+
+    // Give the stream a moment to initialize at full res
+    await new Promise(r => setTimeout(r, 400));
+
+    // Grab full-res frame
+    const track = hiResStream.getVideoTracks()[0];
     const imageCapture = new ImageCapture(track);
     const blob = await imageCapture.takePhoto();
     imageBitmap = await createImageBitmap(blob);
+
+    // Stop full-res stream
+    hiResStream.getTracks().forEach(t => t.stop());
+
+    // Restart low-res viewfinder quietly in background
+    navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
+    }).then(s => {
+      stream = s;
+      video.srcObject = s;
+      video.play().catch(() => {});
+    }).catch(() => {});
+
   } catch (err) {
-    console.warn('ImageCapture failed, falling back to video frame:', err);
+    console.warn('Full-res capture failed, falling back to video frame:', err);
+    // If stream died, restart it
+    if (!stream || !stream.active) bootCam();
   }
 
   let w, h;
