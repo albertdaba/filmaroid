@@ -2806,8 +2806,9 @@ async function shoot() {
   document.getElementById('font-size-controls').style.display = 'none';
   processingEl.style.display = 'flex';
 
-  // Stream-swap: stop low-res, open full-res, capture, restart low-res
-  let imageBitmap = null;
+  let capW = 0, capH = 0;
+  let captureCanvas = null;
+
   try {
     if (!stream || !stream.active) {
       processingEl.style.display = 'none';
@@ -2821,33 +2822,34 @@ async function shoot() {
     stream.getTracks().forEach(t => t.stop());
     stream = null;
 
-    // Open unconstrained full-res stream
+    // Open full-res stream
     const hiResStream = await navigator.mediaDevices.getUserMedia({
       video: { deviceId: { exact: deviceId } }
     });
 
-    // Give the stream a moment to initialize at full res
-// Point video element at full-res stream and wait for it to be ready
+    // Point video at full-res stream
     video.srcObject = hiResStream;
     await video.play();
 
-   // Wait for full-res frame to stabilize
+    // Wait for frames to stabilize at full resolution
     await new Promise(r => setTimeout(r, 800));
 
-    // Capture dimensions from the live track settings
+    // Read actual resolution from track settings
     const settings = hiResStream.getVideoTracks()[0].getSettings();
-    const capW = settings.width || video.videoWidth;
-    const capH = settings.height || video.videoHeight;
+    capW = settings.width || video.videoWidth;
+    capH = settings.height || video.videoHeight;
 
-    // Draw directly from video to a temp canvas — no ImageCapture, no createImageBitmap
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = capW;
-    tempCanvas.height = capH;
-    tempCanvas.getContext('2d').drawImage(video, 0, 0, capW, capH);
-    imageBitmap = { width: capW, height: capH, _canvas: tempCanvas, close: () => {} };
+    // Draw from video directly to a temp canvas — no ImageCapture, no createImageBitmap
+    captureCanvas = document.createElement('canvas');
+    captureCanvas.width = capW;
+    captureCanvas.height = capH;
+    captureCanvas.getContext('2d').drawImage(video, 0, 0, capW, capH);
 
-    // Stop full-res stream and restart low-res viewfinder in background
+    // Stop full-res stream
     hiResStream.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+
+    // Restart low-res viewfinder in background
     navigator.mediaDevices.getUserMedia({
       video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
     }).then(s => {
@@ -2863,14 +2865,8 @@ async function shoot() {
     return;
   }
 
-  let w, h;
-  if (imageBitmap) {
-    w = imageBitmap.width;
-    h = imageBitmap.height;
-  } else {
-    w = video.videoWidth || 640;
-    h = video.videoHeight || 480;
-  }
+  let w = capW;
+  let h = capH;
 
   // Cap longest side at 1920
   const longestSide = Math.max(w, h);
@@ -2893,19 +2889,14 @@ async function shoot() {
 
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, fw, fh);
-  if (imageBitmap) {
-    ctx.drawImage(imageBitmap._canvas || imageBitmap, b, b, w, h);
-    imageBitmap.close();
-  } else {
-    ctx.drawImage(video, b, b, w, h);
-  }
+  ctx.drawImage(captureCanvas, b, b, w, h);
 
   canvas.style.display = 'block';
   video.style.display = 'none';
   nextBtn.style.display = 'flex';
   textBtn.style.display = 'flex';
   saveBtn.style.display = 'flex';
-  
+
   sheetExpanded = false;
   bottomSheet.classList.remove('expanded');
 
