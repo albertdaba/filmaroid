@@ -2804,14 +2804,35 @@ async function shoot() {
   }
 
   document.getElementById('font-size-controls').style.display = 'none';
-  let w = video.videoWidth;
-  let h = video.videoHeight;
+
+  // Try ImageCapture for full resolution, fall back to video frame
+  let imageBitmap = null;
+  try {
+    const track = stream.getVideoTracks()[0];
+    const imageCapture = new ImageCapture(track);
+    const blob = await imageCapture.takePhoto();
+    imageBitmap = await createImageBitmap(blob);
+  } catch (err) {
+    console.warn('ImageCapture failed, falling back to video frame:', err);
+  }
+
+  let w, h;
+  if (imageBitmap) {
+    w = imageBitmap.width;
+    h = imageBitmap.height;
+  } else {
+    w = video.videoWidth;
+    h = video.videoHeight;
+  }
+
+  // Cap longest side at 1920
   const longestSide = Math.max(w, h);
   if (longestSide > 1920) {
     const scale = 1920 / longestSide;
     w = Math.round(w * scale);
     h = Math.round(h * scale);
   }
+
   const b = Math.floor(Math.min(w, h) * 0.09);
   const fw = w + b * 2;
   const bot = b * 2;
@@ -2825,7 +2846,12 @@ async function shoot() {
 
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, fw, fh);
-  ctx.drawImage(video, b, b, w, h);
+  if (imageBitmap) {
+    ctx.drawImage(imageBitmap, b, b, w, h);
+    imageBitmap.close();
+  } else {
+    ctx.drawImage(video, b, b, w, h);
+  }
 
   canvas.style.display = 'block';
   video.style.display = 'none';
