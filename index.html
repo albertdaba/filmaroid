@@ -2164,8 +2164,8 @@ async function bootCam(id = null) {
   if (stream) stream.getTracks().forEach(t => t.stop());
   const c = { 
     video: id 
-      ? { deviceId: {exact: id}, width: { ideal: 640 }, height: { ideal: 480 } }
-      : { facingMode: {ideal: 'environment'}, width: { ideal: 640 }, height: { ideal: 480 } }
+      ? { deviceId: {exact: id} }
+      : { facingMode: {ideal: 'environment'} }
   };
   
   try {
@@ -2809,82 +2809,25 @@ async function shoot() {
   let capW = 0, capH = 0;
   let captureCanvas = null;
 
-  try {
+try {
     if (!stream || !stream.active) {
       processingEl.style.display = 'none';
       alert('Camera not ready');
       return;
     }
 
-    const deviceId = stream.getVideoTracks()[0].getSettings().deviceId;
-
-    // Stop low-res viewfinder
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-
-    // Open full-res stream
-    const hiResStream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: deviceId } }
-    });
-
-    // Point video at full-res stream
-    video.srcObject = hiResStream;
-    await video.play();
-
-    // Wait for frames to stabilize at full resolution
-   // Wait for video to actually report full-res dimensions (poll up to 3 seconds)
-    // Wait for the video element itself to report full-res dimensions
-    await new Promise((resolve) => {
-      const deadline = Date.now() + 4000;
-      function check() {
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-        // Wait until video reports >640 wide AND has actual pixels
-        if ((vw > 640 && vh > 0) || Date.now() > deadline) {
-          resolve();
-        } else {
-          setTimeout(check, 100);
-        }
-      }
-      // Give stream a moment to attach before polling
-      setTimeout(check, 300);
-    });
-
-    // Extra settling time — Safari needs frames to actually flow at new res
-    await new Promise(r => setTimeout(r, 600));
-
+    // Capture directly from the already-running stream — no swap needed
     capW = video.videoWidth;
     capH = video.videoHeight;
 
-    // Fallback: if still at low res, use track settings
-    if (capW <= 640) {
-      const settings = hiResStream.getVideoTracks()[0].getSettings();
-      capW = settings.width || capW;
-      capH = settings.height || capH;
-    }
-    // Draw from video directly to a temp canvas — no ImageCapture, no createImageBitmap
     captureCanvas = document.createElement('canvas');
     captureCanvas.width = capW;
     captureCanvas.height = capH;
     captureCanvas.getContext('2d').drawImage(video, 0, 0, capW, capH);
 
-    // Stop full-res stream
-    hiResStream.getTracks().forEach(t => t.stop());
-    video.srcObject = null;
-
-    // Restart low-res viewfinder in background
-    navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
-    }).then(s => {
-      stream = s;
-      video.srcObject = s;
-      video.play().catch(() => {});
-    }).catch(() => {});
-
   } catch (err) {
     alert('Capture error: ' + err.message);
     processingEl.style.display = 'none';
-    if (!stream || !stream.active) bootCam();
     return;
   }
 
