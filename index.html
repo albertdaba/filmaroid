@@ -2827,13 +2827,23 @@ async function shoot() {
     });
 
     // Give the stream a moment to initialize at full res
-    await new Promise(r => setTimeout(r, 400));
+// Point video element at full-res stream and wait for it to be ready
+    video.srcObject = hiResStream;
+    await video.play();
 
-    // Grab full-res frame
-    const track = hiResStream.getVideoTracks()[0];
-    const imageCapture = new ImageCapture(track);
-    const blob = await imageCapture.takePhoto();
-    imageBitmap = await createImageBitmap(blob);
+    // Wait for the full-res frame to actually render
+    await new Promise(r => setTimeout(r, 600));
+
+    // Draw full-res video frame to an offscreen canvas to get ImageBitmap
+    const offscreen = document.createElement('canvas');
+    offscreen.width = hiResStream.getVideoTracks()[0].getSettings().width;
+    offscreen.height = hiResStream.getVideoTracks()[0].getSettings().height;
+    offscreen.getContext('2d').drawImage(video, 0, 0, offscreen.width, offscreen.height);
+    imageBitmap = await createImageBitmap(offscreen);
+
+    // Stop full-res stream
+    hiResStream.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
 
     // Stop full-res stream
     hiResStream.getTracks().forEach(t => t.stop());
