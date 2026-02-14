@@ -2832,12 +2832,25 @@ async function shoot() {
     await video.play();
 
     // Wait for frames to stabilize at full resolution
-    await new Promise(r => setTimeout(r, 800));
-
-    // Read actual resolution from track settings
-    const settings = hiResStream.getVideoTracks()[0].getSettings();
-    capW = settings.width || video.videoWidth;
-    capH = settings.height || video.videoHeight;
+   // Wait for video to actually report full-res dimensions (poll up to 3 seconds)
+    await new Promise(r => setTimeout(r, 400));
+    await new Promise((resolve) => {
+      const startW = 640; // our viewfinder res — wait until we exceed this
+      const deadline = Date.now() + 3000;
+      function check() {
+        const settings = hiResStream.getVideoTracks()[0].getSettings();
+        const tw = settings.width || video.videoWidth;
+        const th = settings.height || video.videoHeight;
+        if ((tw > startW && tw > 0 && th > 0) || Date.now() > deadline) {
+          capW = tw;
+          capH = th;
+          resolve();
+        } else {
+          setTimeout(check, 100);
+        }
+      }
+      check();
+    });
 
     // Draw from video directly to a temp canvas — no ImageCapture, no createImageBitmap
     captureCanvas = document.createElement('canvas');
