@@ -2833,25 +2833,35 @@ async function shoot() {
 
     // Wait for frames to stabilize at full resolution
    // Wait for video to actually report full-res dimensions (poll up to 3 seconds)
-    await new Promise(r => setTimeout(r, 400));
+    // Wait for the video element itself to report full-res dimensions
     await new Promise((resolve) => {
-      const startW = 640; // our viewfinder res — wait until we exceed this
-      const deadline = Date.now() + 3000;
+      const deadline = Date.now() + 4000;
       function check() {
-        const settings = hiResStream.getVideoTracks()[0].getSettings();
-        const tw = settings.width || video.videoWidth;
-        const th = settings.height || video.videoHeight;
-        if ((tw > startW && tw > 0 && th > 0) || Date.now() > deadline) {
-          capW = tw;
-          capH = th;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        // Wait until video reports >640 wide AND has actual pixels
+        if ((vw > 640 && vh > 0) || Date.now() > deadline) {
           resolve();
         } else {
           setTimeout(check, 100);
         }
       }
-      check();
+      // Give stream a moment to attach before polling
+      setTimeout(check, 300);
     });
 
+    // Extra settling time — Safari needs frames to actually flow at new res
+    await new Promise(r => setTimeout(r, 600));
+
+    capW = video.videoWidth;
+    capH = video.videoHeight;
+
+    // Fallback: if still at low res, use track settings
+    if (capW <= 640) {
+      const settings = hiResStream.getVideoTracks()[0].getSettings();
+      capW = settings.width || capW;
+      capH = settings.height || capH;
+    }
     // Draw from video directly to a temp canvas — no ImageCapture, no createImageBitmap
     captureCanvas = document.createElement('canvas');
     captureCanvas.width = capW;
