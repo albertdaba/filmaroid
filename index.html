@@ -2197,13 +2197,7 @@ async function bootCam(id = null) {
   }
   alert('Camera failed to start');
 }
-    video.srcObject = stream;
-    await video.play();
-    await updateCameraList();
-  } catch (e) {
-    alert('Camera error: ' + e.message);
-  }
-}
+
 
 async function updateCameraList() {
   const devices = await navigator.mediaDevices.enumerateDevices();
