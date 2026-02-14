@@ -2991,12 +2991,11 @@ saveBtn.addEventListener('click', () => {
     return;
   }
   
-  const { fw, fh } = dim;
-  const scale = 1810 / 4420;
+ const { fw, fh } = dim;
   const tmp = document.createElement('canvas');
   
-  tmp.width = Math.floor(fw * scale);
-  tmp.height = Math.floor(fh * scale);
+  tmp.width = fw;
+  tmp.height = fh;
   const tctx = tmp.getContext('2d');
   tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
   
